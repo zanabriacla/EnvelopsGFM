@@ -105,6 +105,7 @@ def GetDeltaP(D_Damping,H,Xtotal_initial,P0):
 #gets a tolerance band equals to the maximum value among 0.02Pn and 5% of DeltaPSteadyState (DeltaP in steady state)
 def GetTunnel(DeltaP):
     Tunnel = max(0.02, 0.05 * DeltaP)
+    print("Tunnel=",Tunnel)
     return Tunnel
 
 #Cuts a signal between a min and a max value
@@ -206,6 +207,10 @@ def AddMargin(MargeUp,Tunnel,RoCofStop_Time):
      RoCofStop_Time = RoCofStop_Time
      #margin = final_margin + (initial_margin - final_margin) * np.exp(-decay_rate * t_DeltaP) + (0.1) * np.exp(-decay_rate * (t_DeltaP - 2))
      margin = initial_margin * ((RoCofStop_Time>=t_DeltaP) &(t_DeltaP>= Event_Time)) * np.exp(-decay_rate * t_DeltaP) + initial_margin * (t_DeltaP >= RoCofStop_Time) * np.exp(-decay_rate * (t_DeltaP - RoCofStop_Time)) + Tunnel
+     # Deactivate only to see the analitical response of Delta¨P
+     # Create the plot
+     #plt.figure(figsize=(8, 5))  # Set figure size
+     #plt.plot(t_DeltaP, margin, label="Ppcc", color='black', linestyle='--')  # First plot
      return margin
 
 
@@ -236,6 +241,16 @@ def KeepTheValueatSpecificTimeLower(Signal,SpecificTime,maskTime):
     Signal = np.where(condition, Signal_value_at_SpecificTime_Time, Signal)
     return Signal
 
+def DelayEnvelops(P_up_finale,P_down_finale,P_PCC,shift_Time):
+    TimeTODelay_All_Signals = shift_Time  # ms
+
+    P_up_finale = delay_signal(TimeTODelay_All_Signals, fs, P_up_finale)
+    P_down_finale = delay_signal(TimeTODelay_All_Signals, fs, P_down_finale)
+    P_PCC = delay_signal(TimeTODelay_All_Signals, fs, P_PCC)
+
+
+    return P_up_finale,P_down_finale,P_PCC
+
 RoCoF = 0.1  # Rate of Change of Frequency (Hz/s)
 H = 2.2       # Inertia constant (s)
 T_pll = 0.01    # PLL time constant (s)
@@ -261,10 +276,11 @@ print("Final DeltaP",RoCoF*(2*H+D_damping*T_pll))
 #second Order system
 
 # Define the time vector for simulation
-Start_Time = -1
-End_Time = 6
-RoCofStop_Time= 3
+Start_Time = -1 # sec
 Event_Time=0 #keep this value to "0"
+RoCofStop_Time= 3 # sec
+End_Time = 8 # sec
+
 
 
 NbPoints = 10000
@@ -330,20 +346,7 @@ stacked = np.vstack((P_down_anal_array ))
 #P down is created from the minimum values of P_down arrays
 P_down_finale = np.nanmin(stacked, axis=0)
 
-# Save to CSV
 
-LocationFile= "P0="+ str(P0) +", RoCoF" + str(RoCoF) +  ", Epsilon= " + str(round(epsilon,3)) + ", ωd= " + ", D= " + str(D_damping) + ", H= " +str(H) + ", Xeff= " + str(Xeff)+".csv"
-# Combine into a DataFrame with custom column names
-df = pd.DataFrame({
-    "Time (s)": t_DeltaP,
-    "P_PCC (pu)": P_PCC,
-    "P_down (pu)": P_down_finale,
-    "P_up (pu)": P_up_finale
-})
-
-# Export to CSV
-
-df.to_csv(LocationFile, index=False)
 
 #Adding delays when the simulation is done in EMT
 if EMT:
@@ -374,19 +377,19 @@ plt.figure(figsize=(8, 5))  # Set figure size
 plt.plot(t_DeltaP+shift_Time,P_PCC, label="Ppcc", color='black', linestyle='--')  # First plot
 plt.plot(t_DeltaP+shift_Time,P_down_anal_array[0], label="Pdown_analytical", color='m', linestyle='--')  # First plot
 
-plt.plot(t_DeltaP+shift_Time,P_up_anal_array[0], label="Pup_analytical", color='r', linestyle='--')  # First plot
-plt.plot(t_DeltaP+shift_Time,P_down_anal_array[1], label="Pdown_analytical", color='m', linestyle=':')  # First plot
-plt.plot(t_DeltaP+shift_Time,P_up_anal_array[1], label="Pup_analytical", color='r', linestyle=':')  # First plot
-plt.plot(t_DeltaP+shift_Time,P_down_anal_array[2], label="Pdown_analytical", color='m', linestyle='-')  # First plot
-plt.plot(t_DeltaP+shift_Time,P_up_anal_array[2], label="Pup_analytical", color='r', linestyle='-')  # First plot
+plt.plot(t_DeltaP+shift_Time,P_up_anal_array[0], label="Pup_analytical", color='m', linestyle='-')  # First plot
+plt.plot(t_DeltaP+shift_Time,P_down_anal_array[1], label="Pdown_analytical", color='r', linestyle='--')  # First plot
+plt.plot(t_DeltaP+shift_Time,P_up_anal_array[1], label="Pup_analytical", color='r', linestyle='-')  # First plot
+plt.plot(t_DeltaP+shift_Time,P_down_anal_array[2], label="Pdown_analytical", color='g', linestyle='--')  # First plot
+plt.plot(t_DeltaP+shift_Time,P_up_anal_array[2], label="Pup_analytical", color='g', linestyle='-')  # First plot
 
 #plt.plot(t_DeltaP+shift_Time,P_50Prc, label="P_50%", linewidth='3')  # First plot
-plt.plot(t_DeltaP+shift_Time,P_down_finale, label="Pdown_final", linewidth=2)  # First plot
-plt.plot(t_DeltaP+shift_Time,P_up_finale, label="Pup_final", linewidth=2)  # First plot
+#plt.plot(t_DeltaP+shift_Time,P_down_finale, label="Pdown_final", linewidth=2)  # First plot
+#plt.plot(t_DeltaP+shift_Time,P_up_finale, label="Pup_final", linewidth=2)  # First plot
 
 
-# Add vertical line at t = 10 seconds
-plt.axvline(x=0.010, color='black', linestyle='--', label='t = 10ms')
+# Add vertical line at t = 20 ms
+plt.axvline(x=0.020, color='black', linestyle='--', label='t = 20ms')
 
 # Add labels, title, and legend
 plt.xlabel("sec")
@@ -396,5 +399,42 @@ plt.legend()  # Show legend
 
 # Show the plot
 plt.grid(True)  # Add grid for better visualization
+
+
+#Delay the signals that will be save in a csv file
+shift_Time = 0 #ms
+P_up_finale,P_down_finale,P_PCC = DelayEnvelops(P_up_finale,P_down_finale,P_PCC,shift_Time)
+
+# Save to CSV
+
+LocationFile= "P0="+ str(P0) +", RoCoF=" + str(RoCoF) +  ", Epsilon= " + str(round(epsilon,3)) + ", ωd= " + ", D= " + str(D_damping) + ", H= " +str(H) + ", Xeff= " + str(Xeff)+".csv"
+# Combine into a DataFrame with custom column names
+df = pd.DataFrame({
+    "Time (s)": t_DeltaP,
+    "P_PCC (pu)": P_PCC,
+    "P_down (pu)": P_down_finale,
+    "P_up (pu)": P_up_finale
+})
+
+# Export to CSV
+
+df.to_csv(LocationFile, index=False)
+
+# Create the plot
+plt.figure(figsize=(8, 5))  # Set figure size
+plt.plot(t_DeltaP,P_PCC, label="P_PCC analytical", linewidth='3')  # First plot
+plt.plot(t_DeltaP,P_down_finale, label="Pdown_final", linewidth=2)  # First plot
+plt.plot(t_DeltaP,P_up_finale, label="Pup_final", linewidth=2)  # First plot
+# Add labels, title, and legend
+plt.xlabel("sec")
+plt.ylabel("P at PCC (pu)")
+plt.title(LocationFile)
+# Add vertical line at t = x seconds
+plt.axvline(x=Event_Time+shift_Time/1000, color='black', linestyle='--', label='t at Event Time')
+plt.title(LocationFile)
+plt.legend(loc='lower right')  # Show legend
+# Show the plot
+plt.grid(True)  # Add grid for better visualization
 plt.show()
+
 

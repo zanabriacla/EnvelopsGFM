@@ -126,6 +126,12 @@ print("Set of H values to be considered", H_array)
 DeltaP, Ppeak, epsilon = GetDeltaP(D_array[0], H_array[0], Xtotal_initial, P0)
 Tunnel = GetTunnel(Ppeak)
 
+# Deactivate only to see the analitical response of Delta¨P
+# Create the plot
+plt.figure(figsize=(8, 5))  # Set figure size
+plt.plot(t_DeltaP, DeltaP, label="Ppcc", color='black', linestyle='--')  # First plot
+
+
 
 #Creating Envelops
 MargeUp=0.1 # This is the Margin up used in DeltaP*(1+-MarginUp)+Tunnel
@@ -158,8 +164,8 @@ if EMT:
     P_up_finale = delay_signal(delay_ms, fs, P_up_finale)
     P_down_finale = delay_signal(delay_ms, fs, P_down_finale)
     P_PCC = delay_signal(delay_ms, fs, P_PCC)
-    P_up_anal =delay_signal(delay_ms, P_up_anal)
-    P_down_anal = delay_signal(delay_ms, P_down_anal)
+    P_up_anal =delay_signal(delay_ms, fs, P_up_anal)
+    P_down_anal = delay_signal(delay_ms, fs , P_down_anal)
 else:
     shift_Time = 0
     delay_samples=0

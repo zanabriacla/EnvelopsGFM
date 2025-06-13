@@ -6,33 +6,7 @@ import math
 import numpy as np
 
 
-def EventOnZgrid_up(Z1,Z2):
-    #INITIALLY Z1 and Z2 are connected in parallel and then Z2 is disconnected
-    # Code block
-    Zgrid_initial = Z1 * Z2 / (Z1 + Z2)  # Initially Z1 and Z2 are connected in paralell
-    Zgrid_final = Z1  # After the event ONLY Z1 is connected
 
-
-    Delta_ZGrid = Zgrid_initial - Zgrid_final  # Variation in Zgrid
-    print("EventOnZgrid_up")
-    print("SCR initial", 1 / Zgrid_initial)
-    print("SCR final", 1 / Zgrid_final)
-    print("Delta X GRID ", Delta_ZGrid)
-    return Delta_ZGrid,Zgrid_initial   # (optional)
-
-def EventOnZgrid_down(Z1,Z2):
-    # INITIALLY only Z1 is connected and then Z1 and Z2 are connected in parallel
-    # Code block
-    Zgrid_initial = Z1  # Z1 is connected
-    Zgrid_final = Z1 * Z2 / (Z1 + Z2)  # Z1 and Z2 are connected
-    Delta_ZGrid = (Zgrid_initial - Zgrid_final)
-
-
-    print("EventOnZgrid_down")
-    print("SCR initial", 1 / Zgrid_initial)
-    print("SCR final", 1 / Zgrid_final)
-    print("Delta X GRID ", Delta_ZGrid)
-    return Delta_ZGrid,Zgrid_initial  # (optional)
 
 
 def delay_signal(delay_ms,fs,signal):
@@ -74,6 +48,11 @@ def GetDeltaP(D,H,Xtotal_initial,P0):
 
     DeltaP_up_anal_array =  np.abs(AmplitudeEnvelops * Ppeak * np.exp(-epsilon * wn * t_DeltaP))
     DeltaP_down_anal_array = np.abs(AmplitudeEnvelops * Ppeak * np.exp(-epsilon * wn * t_DeltaP))*-1
+
+    #Before Event the values of the signals are set to "0"
+    #DeltaP = np.where(t_DeltaP < Event_Time, 0, DeltaP)
+    #DeltaP_up_anal_array = np.where(t_DeltaP < Event_Time, 0, DeltaP_up_anal_array)
+    #DeltaP_down_anal_array = np.where(t_DeltaP < Event_Time, 0, DeltaP_down_anal_array)
     return DeltaP,Ppeak,epsilon, DeltaP_up_anal_array, DeltaP_down_anal_array
 
 def GetTunnel(Ppeak):
@@ -93,7 +72,7 @@ def GetEnvelops(MargeUp,MargeDown,Signal,Tunnel,DeltaP):
     if DeltaP[0] > 0:
         print("DeltaP>0")
         Signal_up_anal = Signal * (1 + MargeUp) + Tunnel + P0
-        Signal_down_anal = DeltaP * (1 - MargeDown) - Tunnel + P0
+        Signal_down_anal = Signal * (1 - MargeDown) - Tunnel + P0
 
         # Putting a limit to the active power "Signal DOWN"
         mask = (t_DeltaP >= Event_Time) & (t_DeltaP <= End_Time)
@@ -105,7 +84,7 @@ def GetEnvelops(MargeUp,MargeDown,Signal,Tunnel,DeltaP):
         print("DeltaP<=0")
         #Signal_up_anal = Signal * (1 - MargeUp) + Tunnel + P0
 
-        Signal_up_anal = DeltaP * (1 - MargeUp) + Tunnel + P0
+        Signal_up_anal = Signal * (1 - MargeUp) + Tunnel + P0
 
         # Putting a limit to the active power "SIGNAL UP"
 
@@ -145,8 +124,8 @@ def LimitingReversePower(P_up_finale,P_down_finale, P0,Tunnel,DeltaP):
 
     return P_up_finale,P_down_finale
 
-def DelayEnvelops(P_up_finale,P_down_finale,P_PCC):
-    TimeTODelay_All_Signals = 1000  # ms
+def DelayEnvelops(P_up_finale,P_down_finale,P_PCC,shift_Time):
+    TimeTODelay_All_Signals = shift_Time  # ms
     TimeTODelay_LowerBoundATBeggining = 50  # ms
 
     P_up_finale = delay_signal(TimeTODelay_All_Signals, fs, P_up_finale)
@@ -175,10 +154,6 @@ def DelayEnvelops(P_up_finale,P_down_finale,P_PCC):
 
 #Variables needed to be fulfilled in order to implement the envelops
 
-EventOnZgrid= "up" # Can be "up" or "down"
-Z1=0.5 # Impedance Z1
-Z2=0.5 # Impedance Z2
-
 SCR_init=5 #SCR ini
 SCR_final=20 #SCR final
 
@@ -199,7 +174,7 @@ Ugrid=1 # RMS voltage Ugrid (pu)
 Uconv=1 # RMS voltage Uconverter (pu)
 Xeff=0.25 # effective reactance (pu)
 EMT= True # Can be "True" or "False" EMT is activated (20ms for the measures)
-P0= -0.95 # Initial power (pu)
+P0= 0.5 # Initial power (pu)
 Pmax_=1.2 #Pmax
 Pmax_MoisTunnel= Pmax_*0.95 #Pmax
 Pmin_=-1.2 #Pmin
@@ -283,10 +258,6 @@ P_PCC=Cutsignal(Pmin_,P0+DeltaP,Pmax_)
 #P_PCC = np.where(P_PCC < -1, -1, P_PCC)
 
 
-# Create the plot
-plt.figure(figsize=(8, 5))  # Set figure size
-plt.plot(t_DeltaP,P_PCC, label="Ppcc", color='black', linestyle='--')  # First plot
-
 
 #Envelop of 50% of Delta before t=10ms and after that it takes DeltaP
 P_50Prc = P0+ np.where(t_DeltaP >= Start_Time, DeltaP*0.5 , DeltaP)
@@ -304,13 +275,13 @@ P_50Prc=Cutsignal(Pmin_,P_50Prc,Pmax_)
 
 # Stack the arrays into a 2D NumPy array
 #stacked = np.vstack((P_up_anal_array , [P_50Prc], P_up_anal_array, Cutsignal(Pmin_,PSecond_up_anal_array,Pmax_), Cutsignal(Pmin_,PSecond_down_anal_array,Pmax_) ))
-stacked = np.vstack((P_up_anal_array , [P_50Prc], PSecond_up_up_anal_array))
+stacked = np.vstack(( PSecond_up_up_anal_array))
 # Compute the element-wise max, ignoring NaNs
 P_up_finale = np.nanmax(stacked, axis=0)
 
 # Stack the arrays into a 2D NumPy array
 #stacked = np.vstack((P_down_anal_array , [P_50Prc], P_up_anal_array, PSecond_up_anal_array, PSecond_down_anal_array ))
-stacked = np.vstack((P_down_anal_array , [P_50Prc], PSecond_down_down_anal_array))
+stacked = np.vstack((P_down_anal_array , [P_50Prc]))
 # Compute the element-wise max, ignoring NaNs
 P_down_finale = np.nanmin(stacked, axis=0)
 
@@ -321,49 +292,6 @@ print("P_50Prc",P_50Prc)
 #cutting Pdown finale and Pup finale in order to avoir reverse power
 
 P_up_finale ,  P_down_finale = LimitingReversePower(P_up_finale,P_down_finale, P0,Tunnel,DeltaP)
-
-
-shift_Time= Event_Time-Start_Time
-
-# Create the plot
-plt.figure(figsize=(8, 5))  # Set figure size
-plt.plot(t_DeltaP+shift_Time,P_PCC, label="Ppcc", color='black', linestyle='--')  # First plot
-
-plt.plot(t_DeltaP+shift_Time,P_down_anal_array[0], label="Pdown_analytical", color='m', linestyle='-')  # First plot
-plt.plot(t_DeltaP+shift_Time,P_up_anal_array[0], label="Pup_analytical", color='b', linestyle='--')  # First plot
-plt.plot(t_DeltaP+shift_Time,P_down_anal_array[1], label="Pdown_analytical", color='m', linestyle='-')  # First plot
-plt.plot(t_DeltaP+shift_Time,P_up_anal_array[1], label="Pup_analytical", color='b', linestyle='--')  # First plot
-plt.plot(t_DeltaP+shift_Time,P_down_anal_array[2], label="Pdown_analytical", color='m', linestyle='-')  # First plot
-plt.plot(t_DeltaP+shift_Time,P_up_anal_array[2], label="Pup_analytical", color='b', linestyle='--')  # First plot
-
-#Plottijg the first order responses envelops of the second order response
-plt.plot(t_DeltaP+shift_Time,PSecond_up_up_anal_array[0], label="PSecond_up_anal_array", color='green', linestyle=':')  # First plot
-plt.plot(t_DeltaP+shift_Time,PSecond_down_down_anal_array[0], label="PSecond_down_anal_array", color='red', linestyle=':')  # First plot
-plt.plot(t_DeltaP+shift_Time,PSecond_up_up_anal_array[1], label="PSecond_up_anal_array", color='green', linestyle=':')  # First plot
-plt.plot(t_DeltaP+shift_Time,PSecond_down_down_anal_array[1], label="PSecond_down_anal_array", color='red', linestyle=':')  # First plot
-plt.plot(t_DeltaP+shift_Time,PSecond_up_up_anal_array[2], label="PSecond_up_anal_array", color='green', linestyle=':')  # First plot
-plt.plot(t_DeltaP+shift_Time,PSecond_down_down_anal_array[2], label="PSecond_down_anal_array", color='red', linestyle=':')  # First plot
-
-
-plt.plot(t_DeltaP+shift_Time,P_50Prc, label="P_50%", linewidth='3')  # First plot
-plt.plot(t_DeltaP+shift_Time,P_down_finale, label="Pdown_final", linewidth=2)  # First plot
-plt.plot(t_DeltaP+shift_Time,P_up_finale, label="Pup_final", linewidth=2)  # First plot
-
-
-# Add vertical line at t = 10 seconds
-plt.axvline(x=0.010, color='black', linestyle='--', label='t = 10ms')
-
-# Add labels, title, and legend
-plt.xlabel("sec")
-plt.ylabel("P at PCC (pu)")
-plt.title("SCRinit= "+str(SCR_init) + ", SCRfinal= "+str(SCR_final) + ", Epsilon= " + str(round(epsilon,3)) + ", ωd= " + ", D= " + str(D) + ", H= " +str(H) + ", Xeff= " + str(Xeff))
-plt.legend(loc='lower right')  # Show legend
-
-# Show the plot
-plt.grid(True)  # Add grid for better visualization
-
-P_up_finale,P_down_finale,P_PCC = DelayEnvelops(P_up_finale,P_down_finale,P_PCC)
-
 
 #Adding delays when the simulation is done in EMT
 if EMT:
@@ -390,6 +318,56 @@ else:
     delay_samples=0
     initial_value = P_up_finale[0]
 
+
+
+shift_Time= Event_Time-Start_Time
+
+# Create the plot
+plt.figure(figsize=(8, 5))  # Set figure size
+plt.plot(t_DeltaP+shift_Time,P_PCC, label="Ppcc", color='black', linestyle='--')  # First plot
+
+plt.plot(t_DeltaP+shift_Time,P_down_anal_array[0], label="Pdown_analytical", color='m', linestyle='-')  # First plot
+plt.plot(t_DeltaP+shift_Time,P_up_anal_array[0], label="Pup_analytical", color='m', linestyle='--')  # First plot
+plt.plot(t_DeltaP+shift_Time,P_down_anal_array[1], label="Pdown_analytical", color='b', linestyle='-')  # First plot
+plt.plot(t_DeltaP+shift_Time,P_up_anal_array[1], label="Pup_analytical", color='b', linestyle='--')  # First plot
+plt.plot(t_DeltaP+shift_Time,P_down_anal_array[2], label="Pdown_analytical", color='g', linestyle='-')  # First plot
+plt.plot(t_DeltaP+shift_Time,P_up_anal_array[2], label="Pup_analytical", color='g', linestyle='--')  # First plot
+
+#Plottijg the first order responses envelops of the second order response
+plt.plot(t_DeltaP+shift_Time,PSecond_up_up_anal_array[0], label="PSecond_up_anal_array", color='r', linestyle=':')  # First plot
+plt.plot(t_DeltaP+shift_Time,PSecond_down_down_anal_array[0], label="PSecond_down_anal_array", color='r', linestyle='-')  # First plot
+plt.plot(t_DeltaP+shift_Time,PSecond_up_up_anal_array[1], label="PSecond_up_anal_array", color='cyan', linestyle=':')  # First plot
+plt.plot(t_DeltaP+shift_Time,PSecond_down_down_anal_array[1], label="PSecond_down_anal_array", color='cyan', linestyle='-')  # First plot
+plt.plot(t_DeltaP+shift_Time,PSecond_up_up_anal_array[2], label="PSecond_up_anal_array", color='brown', linestyle=':')  # First plot
+plt.plot(t_DeltaP+shift_Time,PSecond_down_down_anal_array[2], label="PSecond_down_anal_array", color='brown', linestyle='-')  # First plot
+
+
+plt.plot(t_DeltaP+shift_Time,P_50Prc, label="P_50%", linewidth='3')  # First plot
+#plt.plot(t_DeltaP+shift_Time,P_down_finale, label="Pdown_final", linewidth=2)  # First plot
+#plt.plot(t_DeltaP+shift_Time,P_up_finale, label="Pup_final", linewidth=2)  # First plot
+
+
+# Add vertical line at t = 10 seconds
+plt.axvline(x=0.010, color='black', linestyle='--', label='t = 10ms')
+
+LocationFile = "P0="+ str(P0) +", SCRinit= "+str(SCR_init) + ", SCRfinal= "+str(SCR_final) + ", Epsilon= " + str(round(epsilon,3)) + ", ωd= " + ", D= " + str(D) + ", H= " +str(H) + ", Xeff= " + str(Xeff)
+
+
+# Add labels, title, and legend
+plt.xlabel("sec")
+plt.ylabel("P at PCC (pu)")
+plt.title(LocationFile)
+plt.legend(loc='lower right')  # Show legend
+
+# Show the plot
+plt.grid(True)  # Add grid for better visualization
+
+#Delay the signals that will be save in a csv file
+shift_Time=1000 #ms
+P_up_finale,P_down_finale,P_PCC = DelayEnvelops(P_up_finale,P_down_finale,P_PCC,shift_Time)
+
+
+
 # Save to CSV
 # Combine into a DataFrame with custom column names
 df = pd.DataFrame({
@@ -400,19 +378,25 @@ df = pd.DataFrame({
 })
 
 # Export to CSV
-df.to_csv("signals.csv", index=False)
+df.to_csv(LocationFile, index=False)
 
 
 # Create the plot
 plt.figure(figsize=(8, 5))  # Set figure size
-plt.plot(t_DeltaP+shift_Time,P_PCC, label="P_PCC analytical", linewidth='3')  # First plot
-plt.plot(t_DeltaP+shift_Time,P_down_finale, label="Pdown_final", linewidth=2)  # First plot
-plt.plot(t_DeltaP+shift_Time,P_up_finale, label="Pup_final", linewidth=2)  # First plot
-plt.title("SCRinit= "+str(SCR_init) + ", SCRfinal= "+str(SCR_final) + ", Epsilon= " + str(round(epsilon,3)) + ", ωd= " + ", D= " + str(D) + ", H= " +str(H) + ", Xeff= " + str(Xeff))
+plt.plot(t_DeltaP,P_PCC, label="P_PCC analytical", linewidth='3')  # First plot
+plt.plot(t_DeltaP,P_down_finale, label="Pdown_final", linewidth=2)  # First plot
+plt.plot(t_DeltaP,P_up_finale, label="Pup_final", linewidth=2)  # First plot
+# Add labels, title, and legend
+plt.xlabel("sec")
+plt.ylabel("P at PCC (pu)")
+plt.title(LocationFile)
 plt.legend(loc='lower right')  # Show legend
+# Add vertical line at event time
+plt.axvline(x=Event_Time, color='black', linestyle='--', label='t at Event Time')
 
 # Show the plot
 plt.grid(True)  # Add grid for better visualization
 
 plt.show()
+
 

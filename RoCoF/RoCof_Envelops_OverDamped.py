@@ -251,7 +251,7 @@ def DelayEnvelops(P_up_finale,P_down_finale,P_PCC,shift_Time):
 
     return P_up_finale,P_down_finale,P_PCC
 
-RoCoF = 0.1  # Rate of Change of Frequency (Hz/s)
+RoCoF = -2.5/50  # Rate of Change of Frequency (Hz/s) ou pu ?
 H = 2.2       # Inertia constant (s)
 T_pll = 0.01    # PLL time constant (s)
 SCR=2
@@ -262,7 +262,7 @@ Ugrid=1 # RMS voltage Ugrid (pu)
 Uconv=1 # RMS voltage Uconverter (pu)
 Xeff=0.25 # effective reactance (pu)
 EMT= True # Can be "True" or "False" EMT is activated (20ms for the measures)
-P0= 0.95 # Initial power (pu)
+P0= 0.5 # Initial power (pu)
 Pmax_=1.2 #Pmax
 Pmin_=-1.2 #Pmin
 Pmax_MoisTunnel= Pmax_*0.95 #Considered for current limitation
@@ -278,7 +278,7 @@ print("Final DeltaP",RoCoF*(2*H+D_damping*T_pll))
 # Define the time vector for simulation
 Start_Time = -1 # sec
 Event_Time=0 #keep this value to "0"
-RoCofStop_Time= 3 # sec
+RoCofStop_Time= 0.5 # sec
 End_Time = 8 # sec
 
 
@@ -372,8 +372,64 @@ else:
     delay_samples=0
     initial_value = P_up_finale[0]
 
+
+##############plot PCC from Open Modelica
+
+# Path to the CSV file
+BaseLocation= "RMSsimulations/"
+
+#OverDAMPED
+#csv_file_path_Gabarits=BaseLocation + "gabarit_overdamped.csv"
+#csv_file_path_OM=BaseLocation + "OM_DeltaP_OverDampedSCR2H3D109Angle3.6.csv"
+#csv_file_path_OM=BaseLocation +"H=2.2,D=133,Xeff=0.25,Imax=1.2,P0=0.5,SCR=20,Imax=1.2.csv"
+csv_file_path_OM=BaseLocation +"P0=0.5,H=2.2,D=133,Xeff=0.25,Imax=1.2,P0=0.5,SCR=20,Imax=1.2.csv"
+#Name of the Columns
+NameColumnsDataFrame = ["Time","Pup","Pdown"]
+# Read the CSV file into a DataFrame
+#dataUseCase_Gabarits = pd.read_csv(csv_file_path_Gabarits,sep=";")
+
+dataUseCase_OM = pd.read_csv(csv_file_path_OM)
+
+
+
+P_Pcc="gFM_VSM_cc.measurementPcc.PGenPu"
+
+#filtering times
+TimeInit=9
+TimeFinal=11
+
+TimeInit=14
+TimeFinal=19
+
+#getting time
+t=dataUseCase_OM['time']
+y=dataUseCase_OM[P_Pcc]
+
+# Extract data from t = 5 to t = 10
+mask = (t >= TimeInit) & (t <= TimeFinal)
+t_selected = t[mask]  # Time values in range 10-15
+y_selected = y[mask]  # Corresponding function values
+
+
+
+# Shift time so that it starts at t = 0
+t_shifted = t_selected -t_selected.iloc[0]  # Subtract the first value to start from 0
+#print(t_shifted)
+
+#filtering over a time range
+filtered_dataUseCase_OM = dataUseCase_OM[(dataUseCase_OM['time'] >= TimeInit) & (dataUseCase_OM['time'] <= TimeFinal)]
+
+#Taking the axis X
+axisX = filtered_dataUseCase_OM['time']
+
+
+
 # Create the plot
+Title= "P0="+ str(P0) +", RoCoF=" + str(RoCoF) +  ", Epsilon= " + str(round(epsilon,3)) + ", ωd= " + ", D= " + str(D_damping) + ", H= " +str(H) + ", Xeff= " + str(Xeff)+ ", EMT=" +str(EMT)
+
 plt.figure(figsize=(8, 5))  # Set figure size
+plt.plot(t_shifted-1, y_selected, label="P_pcc from Open Modelica", color='b', linestyle='-')  # First plot
+
 plt.plot(t_DeltaP+shift_Time,P_PCC, label="Ppcc", color='black', linestyle='--')  # First plot
 plt.plot(t_DeltaP+shift_Time,P_down_anal_array[0], label="Pdown_analytical", color='m', linestyle='--')  # First plot
 
@@ -394,7 +450,7 @@ plt.axvline(x=0.020, color='black', linestyle='--', label='t = 20ms')
 # Add labels, title, and legend
 plt.xlabel("sec")
 plt.ylabel("P at PCC (pu)")
-plt.title("RoCof= " +str(RoCoF) + "pu, SCR="+str(SCR) + ", Epsilon= " + str(round(epsilon,3)) + ", ωd= " + ", D= " + str(D_damping) + ", H= " +str(H) + "sec., Xeff= " + str(Xeff)+"pu")
+plt.title(Title)
 plt.legend()  # Show legend
 
 # Show the plot
@@ -406,8 +462,7 @@ shift_Time = 0 #ms
 P_up_finale,P_down_finale,P_PCC = DelayEnvelops(P_up_finale,P_down_finale,P_PCC,shift_Time)
 
 # Save to CSV
-
-LocationFile= "P0="+ str(P0) +", RoCoF=" + str(RoCoF) +  ", Epsilon= " + str(round(epsilon,3)) + ", ωd= " + ", D= " + str(D_damping) + ", H= " +str(H) + ", Xeff= " + str(Xeff)+".csv"
+LocationFile=  "AnalyticalEnvelops/"+Title +".csv"
 # Combine into a DataFrame with custom column names
 df = pd.DataFrame({
     "Time (s)": t_DeltaP,
@@ -425,16 +480,23 @@ plt.figure(figsize=(8, 5))  # Set figure size
 plt.plot(t_DeltaP,P_PCC, label="P_PCC analytical", linewidth='3')  # First plot
 plt.plot(t_DeltaP,P_down_finale, label="Pdown_final", linewidth=2)  # First plot
 plt.plot(t_DeltaP,P_up_finale, label="Pup_final", linewidth=2)  # First plot
+plt.plot(t_shifted-1, y_selected, label="P_pcc from Open Modelica", color='b', linestyle='-')  # First plot
+
 # Add labels, title, and legend
 plt.xlabel("sec")
 plt.ylabel("P at PCC (pu)")
-plt.title(LocationFile)
+plt.title(Title)
 # Add vertical line at t = x seconds
 plt.axvline(x=Event_Time+shift_Time/1000, color='black', linestyle='--', label='t at Event Time')
-plt.title(LocationFile)
 plt.legend(loc='lower right')  # Show legend
 # Show the plot
 plt.grid(True)  # Add grid for better visualization
+
+# Save the figure with specific size and resolution
+Path = "RMSsimulations/PNGResults/"+Title + ".png"
+plt.savefig(Path, bbox_inches='tight', dpi=300)
+
 plt.show()
+
 
 

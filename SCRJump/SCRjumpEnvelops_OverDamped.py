@@ -40,8 +40,8 @@ def GetDeltaP(D,H,Xtotal_initial,P0):
                 A * np.exp(-p1 * t_DeltaP) + B * np.exp(-p2 * t_DeltaP))  # Same as Delta P only another way to get it
     P1 = P0 - DeltaP1
     P = P0 - DeltaP
-    DeltaP=DeltaP*-1
-    DeltaP = np.where(t_DeltaP<Event_Time,0,DeltaP)
+    DeltaP=DeltaP1
+    DeltaP = np.where(t_DeltaP<Event_Time,0,DeltaP1*-1)
     return DeltaP,Ppeak,epsilon
 
 def GetTunnel(Ppeak):
@@ -152,7 +152,7 @@ Delta_ZGrid = Z_final-Z_init #DeltaZgrid
 print("DeltaZgrid",Delta_ZGrid)
 
 
-D=165#Damping constant of the VSM control
+D=133#Damping constant of the VSM control
 H=2.2 #Inertia constant (s)
 wb=314 # Base angular frequency(rad/s)
 xtr=0.15 #Transformer reactance (pu)
@@ -160,11 +160,13 @@ Ugrid=1 # RMS voltage Ugrid (pu)
 Uconv=1 # RMS voltage Uconverter (pu)
 Xeff=0.25 # effective reactance (pu)
 EMT= True # Can be "True" or "False" EMT is activated (20ms for the measures)
-P0= -0.95 # Initial power (pu)
-Pmax_=1.2 #Pmax
-Pmax_MoisTunnel= Pmax_*0.95 #Pmax
-Pmin_=-1.2 #Pmin
-Pmin_MoisTunnel=Pmin_*0.95
+P0= 0.5 # Initial power (pu)
+Pmax_=1.15 #Pmax
+Pmax_MoisTunnel= Pmax_*0.95 #Pmax defined in ENTSOE
+Pmax_MoisTunnel= 1 #Pmax defined by RTE
+Pmin_=-1.15 #Pmin
+Pmin_MoisTunnel= Pmin_*0.95 #Pmax defined in ENTSOE
+Pmin_MoisTunnel=-1 #Pmax defined by RTE
 
 
 #second Order system
@@ -174,19 +176,19 @@ Pmin_MoisTunnel=Pmin_*0.95
 
 Start_Time = -1
 Event_Time = 0
-End_Time = 4
+End_Time = 2
 NbPoints = 10000
 t_DeltaP = np.linspace(Start_Time, End_Time, NbPoints)  # From Start_Time to End_Time
 fs = (End_Time - Start_Time) / NbPoints  # Sampling frequency (Hz)
 
 # Calculating VARIABLES that need to be defined to calculate DeltaP
-Xtotal_initial = Xeff + Z_init  # X total initial that is equal to Xeff+Xgrid inital
+Xtotal_initial = Xeff + Z_final  # X total initial that is equal to Xeff+Xgrid inital
 DeltaXtotal = Delta_ZGrid  # Variation in Xtotal
 
 #Defining margins for H and D
 
-Ratio_H_D_UP = 0.2 # Use to have two more values for D and H: D*(1+Ratio_H_D_UP), H*(1+Ratio_H_D_UP)
-Ratio_H_D_Down = 0.2 # Use to have two more values for D and H: D*(1-Ratio_H_D_Down), H*(1-Ratio_H_D_Down)
+Ratio_H_D_UP = 0.1 # Use to have two more values for D and H: D*(1+Ratio_H_D_UP), H*(1+Ratio_H_D_UP)
+Ratio_H_D_Down = 0.1 # Use to have two more values for D and H: D*(1-Ratio_H_D_Down), H*(1-Ratio_H_D_Down)
 
 # Defining arrays to consider DeltaP for different H and D
 DeltaP_array = []
@@ -209,8 +211,8 @@ Tunnel_array = [GetTunnel(Ppeak_array[i]) for i in range(len(D_array))]
 
 
 #Creating Envelops
-MargeUp=0.25 # This is the Margin up used in DeltaP*(1+-MarginUp)+Tunnel
-MargeDown=0.3 # This is the Margin down used in DeltaP*(1+-MargeDown)+Tunnel
+MargeUp=0.4 # This is the Margin up used in DeltaP*(1+-MarginUp)+Tunnel
+MargeDown=0.4 # This is the Margin down used in DeltaP*(1+-MargeDown)+Tunnel
 DeltaP = DeltaP_array[0]
 Tunnel = Tunnel_array[0]
 epsilon = Epsilon_array[0]
@@ -288,9 +290,79 @@ else:
     delay_samples=0
     initial_value = P_up_finale[0]
 
+
+
+
+
+
+##############plot PCC from Open Modelica
+
+# Path to the CSV file
+BaseLocation= "RMSsimulations/"
+
+#OverDAMPED
+#csv_file_path_Gabarits=BaseLocation + "gabarit_overdamped.csv"
+#csv_file_path_OM=BaseLocation + "OM_DeltaP_OverDampedSCR2H3D109Angle3.6.csv"
+csv_file_path_OM=BaseLocation +"H=2.2,D=133,Xeff=0.25,Imax=1.2,P0=0.5,SCRini=2,SCRmax=10,Imax=1.2.csv"
+#Name of the Columns
+NameColumnsDataFrame = ["Time","Pup","Pdown"]
+# Read the CSV file into a DataFrame
+#dataUseCase_Gabarits = pd.read_csv(csv_file_path_Gabarits,sep=";")
+
+dataUseCase_OM = pd.read_csv(csv_file_path_OM)
+
+
+
+P_Pcc="gFM_VSM_cc.measurementPcc.PGenPu"
+
+#filtering times
+TimeInit=9
+TimeFinal=11
+
+TimeInit=4
+TimeFinal=6
+
+#getting time
+t=dataUseCase_OM['time']
+y=dataUseCase_OM[P_Pcc]
+
+# Extract data from t = 5 to t = 10
+mask = (t >= TimeInit) & (t <= TimeFinal)
+t_selected = t[mask]  # Time values in range 10-15
+y_selected = y[mask]  # Corresponding function values
+
+
+
+# Shift time so that it starts at t = 0
+t_shifted = t_selected -t_selected.iloc[0]  # Subtract the first value to start from 0
+#print(t_shifted)
+
+#filtering over a time range
+filtered_dataUseCase_OM = dataUseCase_OM[(dataUseCase_OM['time'] >= TimeInit) & (dataUseCase_OM['time'] <= TimeFinal)]
+
+#Taking the axis X
+axisX = filtered_dataUseCase_OM['time']
+
+
+# Create the plot
+
+
+
+
+Title =  "P0="+ str(P0) +"pu, SCRinit=" + str(SCR_init) + ", SCRfinal= "+str(SCR_final) + ", Epsilon= " + str(round(epsilon,3))  +", D= " + str(D) + ", H= " +str(H) + ", Xeff= " + str(Xeff)+ ", Pmax="+ str(Pmax_) +"pu" + ", EMT=" +str(EMT)
+
+
+
+
+
+
+
+
+
 # Create the plot
 plt.figure(figsize=(8, 5))  # Set figure size
-plt.plot(t_DeltaP+shift_Time,P_PCC, label="Ppcc", color='black', linestyle='--')  # First plot
+plt.plot(t_shifted-1, y_selected, label="P_pcc from Open Modelica", color='b', linestyle='-')  # First plot
+plt.plot(t_DeltaP+shift_Time,P_PCC, label="Ppcc from Open Modelica", color='black', linestyle='--')  # First plot
 
 plt.plot(t_DeltaP+shift_Time,P_down_anal_array[0], label="Pdown_analytical", color='m', linestyle='-')  # First plot
 plt.plot(t_DeltaP+shift_Time,P_up_anal_array[0], label="Pup_analytical", color='b', linestyle='--')  # First plot
@@ -310,7 +382,7 @@ plt.axvline(x=0.020, color='black', linestyle='--', label='t = 20ms')
 # Add labels, title, and legend
 plt.xlabel("sec")
 plt.ylabel("P at PCC (pu)")
-plt.title("SCRinit= "+str(SCR_init) + ", SCRfinal= "+str(SCR_final) + ", Epsilon= " + str(round(epsilon,3)) + ", ωd= " + ", D= " + str(D) + ", H= " +str(H) + ", Xeff= " + str(Xeff))
+plt.title(Title)
 plt.legend()  # Show legend
 
 # Show the plot
@@ -323,7 +395,9 @@ P_up_finale,P_down_finale,P_PCC = DelayEnvelops(P_up_finale,P_down_finale,P_PCC,
 
 
 
-LocationFile= "P0="+ str(P0) +", SCRinit" + str(SCR_init) + ", SCRfinal= "+str(SCR_final) + ", Epsilon= " + str(round(epsilon,3)) + ", ωd= " + ", D= " + str(D) + ", H= " +str(H) + ", Xeff= " + str(Xeff)+".csv"
+LocationFile=  "AnalyticalEnvelops/"+Title +".csv"
+
+
 # Save to CSV
 # Combine into a DataFrame with custom column names
 df = pd.DataFrame({
@@ -340,6 +414,7 @@ df.to_csv(LocationFile, index=False)
 
 # Create the plot
 plt.figure(figsize=(8, 5))  # Set figure size
+plt.plot(t_shifted-1, y_selected, label="P_pcc from RMS simulation", color='b', linestyle='-')  # First plot
 plt.plot(t_DeltaP,P_PCC, label="P_PCC analytical", linewidth='3')  # First plot
 plt.plot(t_DeltaP,P_down_finale, label="Pdown_final", linewidth=2)  # First plot
 plt.plot(t_DeltaP,P_up_finale, label="Pup_final", linewidth=2)  # First plot
@@ -350,11 +425,15 @@ plt.title(LocationFile)
 
 # Add vertical line at t = 20 ms
 plt.axvline(x=Event_Time+shift_Time/1000, color='black', linestyle='--', label='t at Event Time')
-plt.title("SCRinit= "+str(SCR_init) + ", SCRfinal= "+str(SCR_final) + ", Epsilon= " + str(round(epsilon,3)) + ", ωd= " + ", D= " + str(D) + ", H= " +str(H) + ", Xeff= " + str(Xeff))
+plt.title(Title)
 plt.legend(loc='lower right')  # Show legend
 
 # Show the plot
 plt.grid(True)  # Add grid for better visualization
+# Save the figure with specific size and resolution
+Path = "RMSsimulations/PNGResults/"+Title + ".png"
+#plt.savefig(Path, bbox_inches='tight', dpi=300)
 
 plt.show()
+
 

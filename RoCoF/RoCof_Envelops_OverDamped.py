@@ -278,7 +278,8 @@ print("Final DeltaP",RoCoF*(2*H+D_damping*T_pll))
 # Define the time vector for simulation
 Start_Time = -1 # sec
 Event_Time=0 #keep this value to "0"
-RoCofStop_Time= 0.5 # sec
+RoCofDuration=0.5 # duration of RoCof after that RoCof=0
+RoCofStop_Time= Event_Time+RoCofDuration # sec
 End_Time = 8 # sec
 
 
@@ -379,10 +380,9 @@ else:
 BaseLocation= "RMSsimulations/"
 
 #OverDAMPED
-#csv_file_path_Gabarits=BaseLocation + "gabarit_overdamped.csv"
-#csv_file_path_OM=BaseLocation + "OM_DeltaP_OverDampedSCR2H3D109Angle3.6.csv"
-#csv_file_path_OM=BaseLocation +"H=2.2,D=133,Xeff=0.25,Imax=1.2,P0=0.5,SCR=20,Imax=1.2.csv"
-csv_file_path_OM=BaseLocation +"P0=0.5,H=2.2,D=133,Xeff=0.25,Imax=1.2,P0=0.5,SCR=20,Imax=1.2.csv"
+csv_file_path_OM = BaseLocation + "P0=0.95,RoCoF=0.01,DeltaT=3s,H=2.2,D=133,Xeff=0.25,Imax=1.2,P0=0.5,SCR=20,Imax=1.2.csv"
+csv_file_path_OM = BaseLocation + "P0=0.95,RoCoF=0.05,DeltaT=0.5s,H=2.2,D=133,Xeff=0.25,Imax=1.2,P0=0.5,SCR=20,Imax=1.2.csv"
+csv_file_path_OM = BaseLocation + "P0=0.5,RoCoF=0.05,DeltaT=0.5s,H=2.2,D=133,Xeff=0.25,Imax=1.2,P0=0.5,SCR=20,Imax=1.2.csv"
 #Name of the Columns
 NameColumnsDataFrame = ["Time","Pup","Pdown"]
 # Read the CSV file into a DataFrame
@@ -425,7 +425,7 @@ axisX = filtered_dataUseCase_OM['time']
 
 
 # Create the plot
-Title= "P0="+ str(P0) +", RoCoF=" + str(RoCoF) +  ", Epsilon= " + str(round(epsilon,3)) + ", ωd= " + ", D= " + str(D_damping) + ", H= " +str(H) + ", Xeff= " + str(Xeff)+ ", EMT=" +str(EMT)
+Title= "P0="+ str(P0) +", RoCoF=" + str(RoCoF) + ", Duration="+str(RoCofDuration) +"s" +  ", Epsilon= " + str(round(epsilon,3)) + ", ωd= " + ", D= " + str(D_damping) + ", H= " +str(H) + ", Xeff= " + str(Xeff)+ ", EMT=" +str(EMT)
 
 plt.figure(figsize=(8, 5))  # Set figure size
 plt.plot(t_shifted-1, y_selected, label="P_pcc from Open Modelica", color='b', linestyle='-')  # First plot

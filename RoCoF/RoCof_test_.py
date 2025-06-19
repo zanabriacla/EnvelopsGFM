@@ -70,7 +70,6 @@ def GetDeltaP_NotDELAYED(D_Damping,H,Xtotal_initial,P0,t_DeltaP):
     term1 = (B * alpha1 - C) * np.exp(-alpha1 * t) / (alpha1 - alpha2)
     term2 = (B * alpha2 - C) * np.exp(-alpha2 * t) / (alpha1 - alpha2)
     DeltaP = A + term1 - term2 + D*np.exp(-t/T_pll)/T_pll
-    print("decay rate",max(1/alpha1,1/alpha2,T_pll))
     #Ppeak=DeltaP[-1] # In this case DeltaP steady state will be calculated in another function "GetDeltaP"
     return DeltaP,xi
 
@@ -127,75 +126,63 @@ def GetEnvelops(MargeUp,MargeDown,Signal,Tunnel):
     if RoCoF <= 0:
         print(' RoCoF <= 0 ')
 
-        ########################upper_envelope between Event_Time & RoCofStop_Time #########################
-        margin=AddMargin(MargeUp, Event_Time,RoCofStop_Time)
+        ########################upper_envelope#########################
+        margin=AddMargin(MargeUp, Tunnel, RoCofStop_Time)
         # Envelope curves
-       # upper_envelope = Signal + margin+P0 #adding margin to the envelop
-        mask = (t_DeltaP >= Event_Time) & (t_DeltaP <= RoCofStop_Time)
-        upper_envelope =  margin + GetValueatSpecificTime(RoCofStop_Time,Signal+P0)*(mask)+Tunnel   # adding margin to the envelop
-        print("GetValueatSpecificTime(RoCofStop_Time,Signal) ", GetValueatSpecificTime(RoCofStop_Time, Signal+P0))
-        print("Tunnel",Tunnel)
-
-
-
-        ########################upper_envelope between RoCofStop_Time & End_Time#########################
-
-        mask = (t_DeltaP > RoCofStop_Time) & (t_DeltaP <= End_Time)
-        upper_envelope= upper_envelope + (Signal+P0)*mask + P0*(t_DeltaP < Event_Time)
-
-        # delay upper_envelope during 10ms only at the beginning after the rocof stops
-        upper_envelope = np.where(t_DeltaP > RoCofStop_Time, delay_signal(10, fs, upper_envelope), upper_envelope)
-
-        # Find value of upper_envelope at RoCofStop_Time and use this value to be kept in" the mask range time
-        #mask = (t_DeltaP >= RoCofStop_Time) & (t_DeltaP <= End_Time)
-        #upper_envelope = KeepTheValueatSpecificTimeUpper(upper_envelope, RoCofStop_Time, mask)
-
-        ########################lower_envelope #########################
-        #between RoCofStop_Time & End_Time
-        margin = AddMargin(MargeUp, RoCofStop_Time, End_Time)
+        upper_envelope = Signal + margin+P0 #adding margin to the envelop
+        # Find value of upper_envelope at RoCofStop_Time and use this value to be kept in the mask range time
         mask = (t_DeltaP >= RoCofStop_Time) & (t_DeltaP <= End_Time)
-        lower_envelope = -margin + GetValueatSpecificTime(End_Time, Signal + P0) * (
-            mask) -Tunnel # adding margin to the envelop
+        upper_envelope = KeepTheValueatSpecificTimeUpper(upper_envelope, RoCofStop_Time, mask)
 
-        # t< RoCofStop_Time
-        lower_envelope = np.where(t_DeltaP<RoCofStop_Time, Signal - Tunnel+P0, lower_envelope)
-        #delay lower_envelope during 10ms only at the beginning after the event
-        lower_envelope = np.where(t_DeltaP<RoCofStop_Time, delay_signal(10,fs,lower_envelope), lower_envelope)
 
-        # Deactivate only to see the analitical response of Delta¨P
-        # Create the plot
-        #plt.figure(figsize=(8, 5))  # Set figure size
-        #plt.plot(t_DeltaP, -margin, label="Ppcc", color='red', linestyle='--')  # First plot
+        ########################lower_envelope#########################
+        margin = AddMargin(MargeDown, Tunnel, RoCofStop_Time)
+        # Envelope curves
+        lower_envelope = Signal - margin+P0 #adding margin to the envelop
+        # Find value "P0 - Tunnel" and use this value to be kept in the mask range time
+        mask = (t_DeltaP >= Event_Time) & (t_DeltaP <= RoCofStop_Time)
+        lower_envelope = KeepTheValueatSpecificTimeLower(lower_envelope, Event_Time, mask)
+
+
+
+        #condition = mask & (lower_envelope < (P0 - Tunnel))
+        #lower_envelope = np.where(condition, P0 - Tunnel, lower_envelope)
+
 
 
     else:
         print(' RoCoF > 0 ')
-        ########################lower_envelope between Event_Time & RoCofStop_Time #########################
-        margin = AddMargin(MargeUp, Event_Time, RoCofStop_Time)
+        ########################upper_envelope#########################
+        margin=AddMargin(MargeUp, Tunnel, RoCofStop_Time)
         # Envelope curves
-        # upper_envelope = Signal + margin+P0 #adding margin to the envelop
-        mask = (t_DeltaP >= Event_Time) & (t_DeltaP <= RoCofStop_Time)
-        lower_envelope = -margin + GetValueatSpecificTime(RoCofStop_Time, Signal + P0) * (
-            mask) - Tunnel  # adding margin to the envelop
+        upper_envelope = Signal + margin+P0 #adding margin to the envelop
+        # Find value "P0 + Tunnel" and use this value to be kept in the mask range time
+        mask = (t_DeltaP >= Start_Time) & (t_DeltaP <= RoCofStop_Time)
+        upper_envelope = KeepTheValueatSpecificTimeUpper(upper_envelope, Event_Time, mask)
 
-        ########################upper_envelope between RoCofStop_Time & End_Time#########################
 
-        mask = (t_DeltaP > RoCofStop_Time) & (t_DeltaP <= End_Time)
-        lower_envelope= lower_envelope + (Signal+P0)*mask + P0*(t_DeltaP < Event_Time)
 
-        # Find value of upper_envelope at RoCofStop_Time and use this value to be kept in" the mask range time
-        #mask = (t_DeltaP >= RoCofStop_Time) & (t_DeltaP <= End_Time)
-        #upper_envelope = KeepTheValueatSpecificTimeUpper(upper_envelope, RoCofStop_Time, mask)
 
-        ########################upper_envelope #########################
-        # between RoCofStop_Time & End_Time
-        margin = AddMargin(MargeUp, RoCofStop_Time, End_Time)
+        #mask = (t_DeltaP >= Start_Time) & (t_DeltaP <= RoCofStop_Time)
+        #condition = mask & (upper_envelope > (P0 + Tunnel))
+        #upper_envelope = np.where(mask & (upper_envelope > (P0 + Tunnel)), P0 + Tunnel, upper_envelope)
+
+
+        #Use to debug conditions
+        #print(upper_envelope)
+        #print(np.any(condition))  # Should be True if any value exceeds P0 + Tunnel during the window
+        #print(np.max(upper_envelope[mask]))  # Check actual values
+        #print(P0 + Tunnel)  # Compare to see if condition could ever be True
+
+        ########################lower_envelope#########################
+
+        margin=AddMargin(MargeDown, Tunnel, RoCofStop_Time)
+        #Envelope curves
+        lower_envelope = Signal - margin + P0 #adding margin to the envelop
+        # Find value of lower_envelope at RoCofStop_Time and use this value to be kept in the mask range time
         mask = (t_DeltaP >= RoCofStop_Time) & (t_DeltaP <= End_Time)
-        upper_envelope = margin + GetValueatSpecificTime(End_Time, Signal + P0) * (
-            mask) + Tunnel  # adding margin to the envelop
+        lower_envelope = KeepTheValueatSpecificTimeLower(lower_envelope, RoCofStop_Time, mask)
 
-        # t< RoCofStop_Time
-        upper_envelope = np.where(t_DeltaP < RoCofStop_Time, Signal + Tunnel + P0, upper_envelope)
 
     # Putting a limit to the active power "Signal DOWN" in case of OverCurrent
     mask = (t_DeltaP >= Event_Time) & (t_DeltaP <= End_Time)
@@ -213,19 +200,17 @@ def GetEnvelops(MargeUp,MargeDown,Signal,Tunnel):
     #print(type(Signal_up_anal),"the type of up_anal")
     return upper_envelope,lower_envelope
 
-def AddMargin(initial_margin,InitTime,FinalTime):
-
-     decay_rate = 0.36 # tune this to control how fast the margin narrows
-
-     mask=(FinalTime >= t_DeltaP) & (t_DeltaP >= InitTime)
-    # margin = initial_margin * (mask) * np.exp(-decay_rate * t_DeltaP)  + Tunnel
-     margin = np.where(t_DeltaP < InitTime, 0, np.exp(- (t_DeltaP - InitTime)*1/decay_rate))*mask*initial_margin
-
-
+def AddMargin(MargeUp,Tunnel,RoCofStop_Time):
+     initial_margin = MargeUp
+     final_margin = Tunnel
+     decay_rate = 3  # tune this to control how fast the margin narrows
+     RoCofStop_Time = RoCofStop_Time
+     #margin = final_margin + (initial_margin - final_margin) * np.exp(-decay_rate * t_DeltaP) + (0.1) * np.exp(-decay_rate * (t_DeltaP - 2))
+     margin = initial_margin * ((RoCofStop_Time>=t_DeltaP) &(t_DeltaP>= Event_Time)) * np.exp(-decay_rate * t_DeltaP) + initial_margin * (t_DeltaP >= RoCofStop_Time) * np.exp(-decay_rate * (t_DeltaP - RoCofStop_Time)) + Tunnel
      # Deactivate only to see the analitical response of Delta¨P
      # Create the plot
      #plt.figure(figsize=(8, 5))  # Set figure size
-     #plt.plot(t_DeltaP, margin, label="Ppcc", color='red', linestyle='--')  # First plot
+     #plt.plot(t_DeltaP, margin, label="Ppcc", color='black', linestyle='--')  # First plot
      return margin
 
 
@@ -266,11 +251,11 @@ def DelayEnvelops(P_up_finale,P_down_finale,P_PCC,shift_Time):
 
     return P_up_finale,P_down_finale,P_PCC
 
-RoCoF = -0.5/50  # Rate of Change of Frequency (Hz/s) ou pu ?
-H = 7      # Inertia constant (s)
+RoCoF = -2.5/50  # Rate of Change of Frequency (Hz/s) ou pu ?
+H = 2.2       # Inertia constant (s)
 T_pll = 0.01    # PLL time constant (s)
 SCR=2
-D_damping=200#Damping constant of the VSM control
+D_damping=165#Damping constant of the VSM control
 wb=314 # Base angular frequency(rad/s)
 xtr=0.15 #Transformer reactance (pu)
 Ugrid=1 # RMS voltage Ugrid (pu)
@@ -285,7 +270,6 @@ Pmin_MoisTunnel=Pmin_*0.95 #Considered for current limitation
 
 Z_grid=1/SCR
 
-
 print("Final DeltaP",RoCoF*(2*H+D_damping*T_pll))
 
 
@@ -294,7 +278,7 @@ print("Final DeltaP",RoCoF*(2*H+D_damping*T_pll))
 # Define the time vector for simulation
 Start_Time = -1 # sec
 Event_Time=0 #keep this value to "0"
-RoCofDuration=3 # duration of RoCof after that RoCof=0
+RoCofDuration=0.5 # duration of RoCof after that RoCof=0
 RoCofStop_Time= Event_Time+RoCofDuration # sec
 End_Time = 8 # sec
 
@@ -334,8 +318,8 @@ Tunnel_array = [GetTunnel(DeltaPSteadyState_array[i]) for i in range(len(D_array
 
 
 #Creating Envelops
-MargeUp=0.5 # This is the Margin up used in an exponential function around DeltaP
-MargeDown=0.1 # This is the Margin down used in an exponential function around DeltaP
+MargeUp=Pmax_-P0 # This is the Margin up used in an exponential function around DeltaP
+MargeDown=0.5 # This is the Margin down used in an exponential function around DeltaP
 DeltaP = DeltaP_array[0]
 Tunnel = Tunnel_array[0]
 epsilon = Epsilon_array[0]
@@ -398,7 +382,7 @@ BaseLocation= "RMSsimulations/"
 #OverDAMPED
 csv_file_path_OM = BaseLocation + "P0=0.95,RoCoF=0.01,DeltaT=3s,H=2.2,D=133,Xeff=0.25,Imax=1.2,P0=0.5,SCR=20,Imax=1.2.csv"
 csv_file_path_OM = BaseLocation + "P0=0.95,RoCoF=0.05,DeltaT=0.5s,H=2.2,D=133,Xeff=0.25,Imax=1.2,P0=0.5,SCR=20,Imax=1.2.csv"
-csv_file_path_OM = BaseLocation + "P0=0.5,RoCoF=-0.01,DeltaT=3s,H=7,D=200,Xeff=0.25,Imax=1.2,P0=0.5,SCR=20,Imax=1.2.csv"
+csv_file_path_OM = BaseLocation + "P0=0.5,RoCoF=0.05,DeltaT=0.5s,H=2.2,D=133,Xeff=0.25,Imax=1.2,P0=0.5,SCR=20,Imax=1.2.csv"
 #Name of the Columns
 NameColumnsDataFrame = ["Time","Pup","Pdown"]
 # Read the CSV file into a DataFrame
@@ -438,22 +422,6 @@ filtered_dataUseCase_OM = dataUseCase_OM[(dataUseCase_OM['time'] >= TimeInit) & 
 #Taking the axis X
 axisX = filtered_dataUseCase_OM['time']
 
-#Results from EMT
-
-##############plot PCC from Open Modelica
-
-# Path to the CSV file
-BaseLocation= "EMTSimulations/RoCof=0.01,P0=0.5,Duration=3s.csv"
-
-#OverDAMPED
-csv_file_path_EMT = BaseLocation
-#Name of the Columns
-NameColumnsDataFrame = ["Time","Signal"]
-# Read the CSV file into a DataFrame
-dataUseCase_EMT = pd.read_csv(csv_file_path_EMT)
-# Access the columns
-time = dataUseCase_EMT['Time']
-signal = dataUseCase_EMT['Signal']
 
 
 # Create the plot
@@ -461,7 +429,7 @@ Title= "P0="+ str(P0) +", RoCoF=" + str(RoCoF) + ", Duration="+str(RoCofDuration
 
 plt.figure(figsize=(8, 5))  # Set figure size
 plt.plot(t_shifted-1, y_selected, label="P_pcc from Open Modelica", color='b', linestyle='-')  # First plot
-plt.plot(time, signal, label="P_pcc from EMTP", color='gold', linestyle='-')  # EMT plot
+
 plt.plot(t_DeltaP+shift_Time,P_PCC, label="Ppcc", color='black', linestyle='--')  # First plot
 plt.plot(t_DeltaP+shift_Time,P_down_anal_array[0], label="Pdown_analytical", color='m', linestyle='--')  # First plot
 
@@ -510,7 +478,6 @@ df.to_csv(LocationFile, index=False)
 # Create the plot
 plt.figure(figsize=(8, 5))  # Set figure size
 plt.plot(t_DeltaP,P_PCC, label="P_PCC analytical", linewidth='3')  # First plot
-plt.plot(time, signal, label="P_pcc from EMTP", color='gold', linestyle='-')  # EMT plot
 plt.plot(t_DeltaP,P_down_finale, label="Pdown_final", linewidth=2)  # First plot
 plt.plot(t_DeltaP,P_up_finale, label="Pup_final", linewidth=2)  # First plot
 plt.plot(t_shifted-1, y_selected, label="P_pcc from Open Modelica", color='b', linestyle='-')  # First plot
@@ -530,6 +497,3 @@ Path = "RMSsimulations/PNGResults/"+Title + ".png"
 plt.savefig(Path, bbox_inches='tight', dpi=300)
 
 plt.show()
-
-
-

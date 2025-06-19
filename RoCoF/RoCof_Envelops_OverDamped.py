@@ -266,7 +266,7 @@ def DelayEnvelops(P_up_finale,P_down_finale,P_PCC,shift_Time):
 
     return P_up_finale,P_down_finale,P_PCC
 
-RoCoF = -0.5/50  # Rate of Change of Frequency (Hz/s) ou pu ?
+RoCoF = -2.5/50  # Rate of Change of Frequency (Hz/s) ou pu ?
 H = 7      # Inertia constant (s)
 T_pll = 0.01    # PLL time constant (s)
 SCR=2
@@ -294,7 +294,7 @@ print("Final DeltaP",RoCoF*(2*H+D_damping*T_pll))
 # Define the time vector for simulation
 Start_Time = -1 # sec
 Event_Time=0 #keep this value to "0"
-RoCofDuration=3 # duration of RoCof after that RoCof=0
+RoCofDuration=0.5 # duration of RoCof after that RoCof=0
 RoCofStop_Time= Event_Time+RoCofDuration # sec
 End_Time = 8 # sec
 
@@ -397,8 +397,9 @@ BaseLocation= "RMSsimulations/"
 
 #OverDAMPED
 csv_file_path_OM = BaseLocation + "P0=0.95,RoCoF=0.01,DeltaT=3s,H=2.2,D=133,Xeff=0.25,Imax=1.2,P0=0.5,SCR=20,Imax=1.2.csv"
-csv_file_path_OM = BaseLocation + "P0=0.95,RoCoF=0.05,DeltaT=0.5s,H=2.2,D=133,Xeff=0.25,Imax=1.2,P0=0.5,SCR=20,Imax=1.2.csv"
-csv_file_path_OM = BaseLocation + "P0=0.5,RoCoF=-0.01,DeltaT=3s,H=7,D=200,Xeff=0.25,Imax=1.2,P0=0.5,SCR=20,Imax=1.2.csv"
+#csv_file_path_OM = BaseLocation + "P0=0.5,RoCoF=-0.01,DeltaT=3s,H=2.2,KPowerDamping=25,KAngleDamping=26,Xeff=0.25,Imax=1.2,P0=0.5,SCR=20,Imax=1.2.csv"
+csv_file_path_OM = BaseLocation + "P0=0.5,RoCoF=-0.05,DeltaT=0.5s,H=2.2,KPowerDamping=25,KAngleDamping=26,Xeff=0.25,Imax=1.2,P0=0.5,SCR=20,Imax=1.2.csv"
+
 #Name of the Columns
 NameColumnsDataFrame = ["Time","Pup","Pdown"]
 # Read the CSV file into a DataFrame
@@ -443,8 +444,8 @@ axisX = filtered_dataUseCase_OM['time']
 ##############plot PCC from Open Modelica
 
 # Path to the CSV file
-BaseLocation= "EMTSimulations/RoCof=0.01,P0=0.5,Duration=3s.csv"
-
+#BaseLocation= "EMTSimulations/RoCof=0.01,P0=0.5,Duration=3s.csv"
+BaseLocation= "EMTSimulations/RoCof=0.05,P0=0.5,Duration=0.5s.csv"
 #OverDAMPED
 csv_file_path_EMT = BaseLocation
 #Name of the Columns

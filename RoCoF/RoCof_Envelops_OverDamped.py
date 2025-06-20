@@ -266,7 +266,7 @@ def DelayEnvelops(P_up_finale,P_down_finale,P_PCC,shift_Time):
 
     return P_up_finale,P_down_finale,P_PCC
 
-RoCoF = -2.5/50  # Rate of Change of Frequency (Hz/s) ou pu ?
+RoCoF = 2.5/50  # Rate of Change of Frequency (Hz/s) ou pu ?
 H = 7      # Inertia constant (s)
 T_pll = 0.01    # PLL time constant (s)
 SCR=2
@@ -277,7 +277,7 @@ Ugrid=1 # RMS voltage Ugrid (pu)
 Uconv=1 # RMS voltage Uconverter (pu)
 Xeff=0.25 # effective reactance (pu)
 EMT= True # Can be "True" or "False" EMT is activated (20ms for the measures)
-P0= 0.5 # Initial power (pu)
+P0= -0.5 # Initial power (pu)
 Pmax_=1.2 #Pmax
 Pmin_=-1.2 #Pmin
 Pmax_MoisTunnel= Pmax_*0.95 #Considered for current limitation

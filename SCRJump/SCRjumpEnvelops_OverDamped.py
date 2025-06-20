@@ -140,8 +140,8 @@ def DelayEnvelops(P_up_finale,P_down_finale,P_PCC,shift_Time):
     return P_up_finale,P_down_finale,P_PCC
 
 
-SCR_init=10 #SCR initial
-SCR_final=2 #SCR final
+SCR_init=2 #SCR initial
+SCR_final=10 #SCR final
 
 Z_init=1/SCR_init
 Z_final=1/SCR_final
@@ -152,13 +152,13 @@ Delta_ZGrid = Z_final-Z_init #DeltaZgrid
 print("DeltaZgrid",Delta_ZGrid)
 
 
-D=133#Damping constant of the VSM control
+D=200#Damping constant of the VSM control
 H=2.2 #Inertia constant (s)
 wb=314 # Base angular frequency(rad/s)
 xtr=0.15 #Transformer reactance (pu)
 Ugrid=1 # RMS voltage Ugrid (pu)
 Uconv=1 # RMS voltage Uconverter (pu)
-Xeff=0.25 # effective reactance (pu)
+Xeff=0.06 # effective reactance (pu)
 EMT= True # Can be "True" or "False" EMT is activated (20ms for the measures)
 P0= 0.5 # Initial power (pu)
 Pmax_=1.15 #Pmax

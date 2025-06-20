@@ -334,7 +334,7 @@ Tunnel_array = [GetTunnel(DeltaPSteadyState_array[i]) for i in range(len(D_array
 
 
 #Creating Envelops
-MargeUp=0.5 # This is the Margin up used in an exponential function around DeltaP
+MargeUp=0.1 # This is the Margin up used in an exponential function around DeltaP
 MargeDown=0.1 # This is the Margin down used in an exponential function around DeltaP
 DeltaP = DeltaP_array[0]
 Tunnel = Tunnel_array[0]

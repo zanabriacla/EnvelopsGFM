@@ -165,7 +165,7 @@ def GetValueatSpecificTime(SelectedTime,Signal):
 #Variables needed to be fulfilled in order to implement the envelops
 
 SCR_init=2 #SCR ini
-SCR_final=4 #SCR final
+SCR_final=10 #SCR final
 
 Z_init=1/SCR_init
 Z_final=1/SCR_final
@@ -176,14 +176,14 @@ Delta_ZGrid = Z_final-Z_init #DeltaZgrid
 print("DeltaZgrid",Delta_ZGrid)
 
 
-D=140#Damping constant of the VSM control
-H=5 #Inertia constant (s)
+D=220#Damping constant of the VSM control
+H=7 #Inertia constant (s)
 wb=314 # Base angular frequency(rad/s)
 xtr=0.06 #Transformer reactance (pu)
 Ugrid=1 # RMS voltage Ugrid (pu)
 Uconv=1 # RMS voltage Uconverter (pu)
-Xeff=0.06 # effective reactance (pu)
-EMT= False # Can be "True" or "False" EMT is activated (20ms for the measures)
+Xeff=0.25 # effective reactance (pu)
+EMT= True # Can be "True" or "False" EMT is activated (20ms for the measures)
 P0= 0.5 # Initial power (pu)
 Pmax_=1.2 #Pmax
 Pmax_MoisTunnel= Pmax_*0.95 #Pmax

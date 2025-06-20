@@ -152,13 +152,13 @@ Delta_ZGrid = Z_final-Z_init #DeltaZgrid
 print("DeltaZgrid",Delta_ZGrid)
 
 
-D=200#Damping constant of the VSM control
-H=2.2 #Inertia constant (s)
+D=205#Damping constant of the VSM control
+H=7.5 #Inertia constant (s)
 wb=314 # Base angular frequency(rad/s)
 xtr=0.15 #Transformer reactance (pu)
 Ugrid=1 # RMS voltage Ugrid (pu)
 Uconv=1 # RMS voltage Uconverter (pu)
-Xeff=0.06 # effective reactance (pu)
+Xeff=0.25 # effective reactance (pu)
 EMT= True # Can be "True" or "False" EMT is activated (20ms for the measures)
 P0= 0.5 # Initial power (pu)
 Pmax_=1.15 #Pmax

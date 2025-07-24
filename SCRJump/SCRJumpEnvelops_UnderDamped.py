@@ -100,6 +100,11 @@ def GetEnvelops(MargeUp,MargeDown,Signal,Tunnel,DeltaP):
     print(type(Signal_up_anal),"the type of up_anal")
     return Signal_up_anal,Signal_down_anal
 
+def EnvelopDowModify(Signal_Down,P_50Prc):
+    DeltaTInitToKeepPeakP_50Prc = 0.03  # 50ms we kept the value of P_50Prc after that we consider the value of the PSecond_down_up_anal_array
+    Signal_Down = np.where(t_DeltaP <= Start_Time + 1 +DeltaTInitToKeepPeakP_50Prc, P_50Prc, Signal_Down)
+    return Signal_Down
+
 def LimitingReversePower(P_up_finale,P_down_finale, P0,Tunnel,DeltaP):
 
         # Creating Envelops
@@ -170,14 +175,16 @@ SCR_final=10 #SCR final
 Z_init=1/SCR_init
 Z_final=1/SCR_final
 
+print(Z_init)
+print(Z_final)
 
 Delta_ZGrid = Z_final-Z_init #DeltaZgrid
 
 print("DeltaZgrid",Delta_ZGrid)
 
 
-D=220#Damping constant of the VSM control
-H=7 #Inertia constant (s)
+D=100#Damping constant of the VSM control
+H=3 #Inertia constant (s)
 wb=314 # Base angular frequency(rad/s)
 xtr=0.06 #Transformer reactance (pu)
 Ugrid=1 # RMS voltage Ugrid (pu)
@@ -258,12 +265,16 @@ results = [GetEnvelops(MargeUp,MargeDown,DeltaP_array[i],Tunnel_array[i],DeltaP)
 results_PSecond_up_anal_array= [GetEnvelops(MargeUp,MargeDown,DeltaPSecond_up_anal_array[i],Tunnel_array[i],DeltaP) for i in range(len(D_array))]
 results_PSecond_down_anal_array= [GetEnvelops(MargeUp,MargeDown,DeltaPSecond_down_anal_array[i],Tunnel_array[i],DeltaP) for i in range(len(D_array))]
 
+
+
 #Second order limit
 P_up_anal_array, P_down_anal_array = map(np.array, zip(*results))
 #First order limit for P up
 PSecond_up_up_anal_array, PSecond_up_down_anal_array = map(np.array, zip(*results_PSecond_up_anal_array))
 #First order limit for P down
 PSecond_down_up_anal_array, PSecond_down_down_anal_array  = map(np.array, zip(*results_PSecond_down_anal_array))
+
+
 
 #Theoretical Value
 #P_PCC= P0+DeltaP
@@ -275,6 +286,11 @@ P_PCC=Cutsignal(Pmin_,P0+DeltaP,Pmax_)
 #Envelop of 50% of Delta before t=10ms and after that it takes DeltaP
 P_50Prc = P0+ np.where(t_DeltaP >= Start_Time, DeltaP*0.5 , DeltaP)
 P_50Prc=Cutsignal(Pmin_,P_50Prc,Pmax_)
+
+
+
+print("Start_Time+0.2",Start_Time+0.2)
+
 
 #From different possibilities , we select the max value for Envelop UP and the MIN value for envelop DOWN
 #P_up_finale = np.maximum(P_up_anal_array[0], P_up_anal_array[1],P_50Prc)
@@ -288,16 +304,17 @@ P_50Prc=Cutsignal(Pmin_,P_50Prc,Pmax_)
 
 # Stack the arrays into a 2D NumPy array
 #stacked = np.vstack((P_up_anal_array , [P_50Prc], P_up_anal_array, Cutsignal(Pmin_,PSecond_up_anal_array,Pmax_), Cutsignal(Pmin_,PSecond_down_anal_array,Pmax_) ))
-stacked = np.vstack(( P_up_anal_array, [P_50Prc] ))
+stacked = np.vstack(( P_up_anal_array, [P_50Prc], PSecond_up_up_anal_array ))
 # Compute the element-wise max, ignoring NaNs
 P_up_finale = np.nanmax(stacked, axis=0)
 
 
 # Stack the arrays into a 2D NumPy array
 #stacked = np.vstack((P_down_anal_array , [P_50Prc], P_up_anal_array, PSecond_up_anal_array, PSecond_down_anal_array ))
-stacked = np.vstack((P_down_anal_array, [P_50Prc]))
+stacked = np.vstack((P_down_anal_array, [P_50Prc],PSecond_down_down_anal_array))
 # Compute the element-wise max, ignoring NaNs
 P_down_finale = np.nanmin(stacked, axis=0)
+P_down_finale= EnvelopDowModify(P_down_finale,P_50Prc)
 
 print("P_50Prc",P_50Prc)
 
@@ -314,7 +331,7 @@ if EMT:
     shift_Time = 0
     # Pad with the initial value instead of zero
     initial_value = P_up_finale[0]
-    P_up_finale = delay_signal(delay_ms, fs, P_up_finale)
+    #P_up_finale = delay_signal(delay_ms, fs, P_up_finale)
     P_down_finale = delay_signal(delay_ms, fs, P_down_finale)
     P_PCC = delay_signal(delay_ms, fs, P_PCC)
     P_50Prc = delay_signal(delay_ms, fs, P_50Prc)
@@ -390,8 +407,28 @@ axisX = filtered_dataUseCase_OM['time']
 
 Title =  "P0="+ str(P0) +"pu, SCRinit=" + str(SCR_init) + ", SCRfinal= "+str(SCR_final) + ", Epsilon= " + str(round(epsilon,3))  +", D= " + str(D) + ", H= " +str(H) + ", Xeff= " + str(Xeff)+ ", Pmax="+ str(Pmax_) +"pu"+ ", EMT=" +str(EMT)
 
+#Plot EMT
+BaseLocation= "EMTSimulations/Ppos_GFM_EMT_model_P0=0.5.csv"
+csv_file_path_EMT = BaseLocation
+#Name of the Columns
+NameColumnsDataFrame = ["Time","Signal"]
+# Read the CSV file into a DataFrame
+dataUseCase_EMT = pd.read_csv(csv_file_path_EMT)
+# Access the columns
+time1 = dataUseCase_EMT['Time']
+Ppos_GFM_EMT_model = dataUseCase_EMT['Signal']
 
 
+#Plot EMT
+BaseLocation= "EMTSimulations/Ppos_GFM_ideal_P0=0.5.csv"
+csv_file_path_EMT = BaseLocation
+#Name of the Columns
+NameColumnsDataFrame = ["Time","Signal"]
+# Read the CSV file into a DataFrame
+dataUseCase_EMT = pd.read_csv(csv_file_path_EMT)
+# Access the columns
+time2 = dataUseCase_EMT['Time']
+Ppos_GFM_ideal = dataUseCase_EMT['Signal']
 
 
 
@@ -402,27 +439,31 @@ shift_Time= 0
 
 # Create the plot
 plt.figure(figsize=(8, 5))  # Set figure size
-plt.plot(t_shifted-1, y_selected, label="P_pcc from Open Modelica", color='b', linestyle='-')  # Adding simulation
-plt.plot(t_DeltaP+shift_Time,P_PCC, label="Ppcc", color='black', linestyle='--')  # First plot
+plt.plot(t_shifted-1, y_selected, label="P_pcc from Open Modelica", color='red', linestyle='-')  # Adding simulation
 
-plt.plot(t_DeltaP+shift_Time,P_down_anal_array[0], label="Pdown_analytical", color='m', linestyle='-')  # First plot
-plt.plot(t_DeltaP+shift_Time,P_up_anal_array[0], label="Pup_analytical", color='m', linestyle='--')  # First plot
-plt.plot(t_DeltaP+shift_Time,P_down_anal_array[1], label="Pdown_analytical", color='b', linestyle='-')  # First plot
-plt.plot(t_DeltaP+shift_Time,P_up_anal_array[1], label="Pup_analytical", color='b', linestyle='--')  # First plot
-plt.plot(t_DeltaP+shift_Time,P_down_anal_array[2], label="Pdown_analytical", color='g', linestyle='-')  # First plot
-plt.plot(t_DeltaP+shift_Time,P_up_anal_array[2], label="Pup_analytical", color='g', linestyle='--')  # First plot
+plt.plot(t_DeltaP+shift_Time,P_PCC, label="Ppcc", color='m', linestyle='-')  # First plot
+plt.plot(t_DeltaP+shift_Time,P_down_anal_array[0], label="Pdown_analytical", color='m', linestyle='--')  # First plot
+plt.plot(t_DeltaP+shift_Time,P_up_anal_array[0], label="Pup_analytical", color='m', linestyle=':')  # First plot
+
+plt.plot(t_DeltaP+shift_Time,P_down_anal_array[1], label="Pdown_analytical", color='black', linestyle='--')  # First plot
+plt.plot(t_DeltaP+shift_Time,P_up_anal_array[1], label="Pup_analytical", color='black', linestyle=':')  # First plot
+
+plt.plot(t_DeltaP+shift_Time,P_down_anal_array[2], label="Pdown_analytical", color='r', linestyle='--')  # First plot
+plt.plot(t_DeltaP+shift_Time,P_up_anal_array[2], label="Pup_analytical", color='r', linestyle=':')  # First plot
 
 #Plottijg the first order responses envelops of the second order response
-plt.plot(t_DeltaP+shift_Time,PSecond_up_up_anal_array[0], label="PSecond_up_anal_array", color='r', linestyle=':')  # First plot
-plt.plot(t_DeltaP+shift_Time,PSecond_down_down_anal_array[0], label="PSecond_down_anal_array", color='r', linestyle='-')  # First plot
-plt.plot(t_DeltaP+shift_Time,PSecond_up_up_anal_array[1], label="PSecond_up_anal_array", color='cyan', linestyle=':')  # First plot
-plt.plot(t_DeltaP+shift_Time,PSecond_down_down_anal_array[1], label="PSecond_down_anal_array", color='cyan', linestyle='-')  # First plot
-plt.plot(t_DeltaP+shift_Time,PSecond_up_up_anal_array[2], label="PSecond_up_anal_array", color='brown', linestyle=':')  # First plot
-plt.plot(t_DeltaP+shift_Time,PSecond_down_down_anal_array[2], label="PSecond_down_anal_array", color='brown', linestyle='-')  # First plot
 
+plt.plot(t_DeltaP+shift_Time,PSecond_up_up_anal_array[0], label="PSecond_up_anal_array", color='m', linestyle=':')  # First plot
+plt.plot(t_DeltaP+shift_Time,PSecond_down_down_anal_array[0], label="PSecond_down_anal_array", color='m', linestyle='-')  # First plot
+
+plt.plot(t_DeltaP+shift_Time,PSecond_up_up_anal_array[1], label="PSecond_up_anal_array", color='black', linestyle=':')  # First plot
+plt.plot(t_DeltaP+shift_Time,PSecond_down_down_anal_array[1], label="PSecond_down_anal_array", color='black', linestyle='-')  # First plot
+
+plt.plot(t_DeltaP+shift_Time,PSecond_up_up_anal_array[2], label="PSecond_up_anal_array", color='r', linestyle=':')  # First plot
+plt.plot(t_DeltaP+shift_Time,PSecond_down_down_anal_array[2], label="PSecond_down_anal_array", color='r', linestyle='-')  # First plot
 
 plt.plot(t_DeltaP+shift_Time,P_50Prc, label="P_50%", linewidth='3')  # First plot
-#plt.plot(t_DeltaP+shift_Time,P_down_finale, label="Pdown_final", linewidth=2)  # First plot
+
 #plt.plot(t_DeltaP+shift_Time,P_up_finale, label="Pup_final", linewidth=2)  # First plot
 
 
@@ -465,6 +506,8 @@ plt.plot(t_shifted-1, y_selected, label="P_pcc from Open Modelica", color='b', l
 plt.plot(t_DeltaP,P_PCC, label="P_PCC analytical", linewidth='3')  # First plot
 plt.plot(t_DeltaP,P_down_finale, label="Pdown_final", linewidth=2)  # First plot
 plt.plot(t_DeltaP,P_up_finale, label="Pup_final", linewidth=2)  # First plot
+plt.plot(time1, Ppos_GFM_EMT_model, label="Ppos_GFM_EMT_model from EMTP", color='gold', linestyle='-')  # EMT plot
+plt.plot(time2, Ppos_GFM_ideal, label="Ppos_GFM_ideal from EMTP", color='red', linestyle='-')  # EMT plot
 # Add labels, title, and legend
 plt.xlabel("sec")
 plt.ylabel("P at PCC (pu)")

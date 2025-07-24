@@ -152,10 +152,10 @@ Delta_ZGrid = Z_final-Z_init #DeltaZgrid
 print("DeltaZgrid",Delta_ZGrid)
 
 
-D=205#Damping constant of the VSM control
-H=7.5 #Inertia constant (s)
+D=100#Damping constant of the VSM control
+H=3.1 #Inertia constant (s)
 wb=314 # Base angular frequency(rad/s)
-xtr=0.15 #Transformer reactance (pu)
+xtr=0.06 #Transformer reactance (pu)
 Ugrid=1 # RMS voltage Ugrid (pu)
 Uconv=1 # RMS voltage Uconverter (pu)
 Xeff=0.25 # effective reactance (pu)
@@ -187,8 +187,8 @@ DeltaXtotal = Delta_ZGrid  # Variation in Xtotal
 
 #Defining margins for H and D
 
-Ratio_H_D_UP = 0.1 # Use to have two more values for D and H: D*(1+Ratio_H_D_UP), H*(1+Ratio_H_D_UP)
-Ratio_H_D_Down = 0.1 # Use to have two more values for D and H: D*(1-Ratio_H_D_Down), H*(1-Ratio_H_D_Down)
+Ratio_H_D_UP = 0.2 # Use to have two more values for D and H: D*(1+Ratio_H_D_UP), H*(1+Ratio_H_D_UP)
+Ratio_H_D_Down = 0.2 # Use to have two more values for D and H: D*(1-Ratio_H_D_Down), H*(1-Ratio_H_D_Down)
 
 # Defining arrays to consider DeltaP for different H and D
 DeltaP_array = []
@@ -272,7 +272,7 @@ if EMT:
     shift_Time = 0
     # Pad with the initial value instead of zero
     initial_value = P_up_finale[0]
-    P_up_finale = delay_signal(delay_ms, fs, P_up_finale)
+   # P_up_finale = delay_signal(delay_ms, fs, P_up_finale)
     P_down_finale = delay_signal(delay_ms, fs, P_down_finale)
     P_PCC = delay_signal(delay_ms, fs, P_PCC)
     P_50Prc = delay_signal(delay_ms, fs, P_50Prc)
@@ -301,9 +301,9 @@ else:
 BaseLocation= "RMSsimulations/"
 
 #OverDAMPED
-#csv_file_path_Gabarits=BaseLocation + "gabarit_overdamped.csv"
-#csv_file_path_OM=BaseLocation + "OM_DeltaP_OverDampedSCR2H3D109Angle3.6.csv"
-csv_file_path_OM=BaseLocation +"H=2.2,D=133,Xeff=0.25,Imax=1.2,P0=0.5,SCRini=2,SCRmax=10,Imax=1.2.csv"
+#csv_file_path_OM=BaseLocation +"H=2.2,D=133,Xeff=0.25,Imax=1.2,P0=0.5,SCRini=2,SCRmax=10,Imax=1.2.csv"
+csv_file_path_OM=BaseLocation + "SCRJump_SCR2TO10_WithoutWashOutFilter.csv"
+#csv_file_path_OM=BaseLocation + "SCRJump_SCR2TO10_WithWashOutFilter.csv"
 #Name of the Columns
 NameColumnsDataFrame = ["Time","Pup","Pdown"]
 # Read the CSV file into a DataFrame
@@ -316,11 +316,9 @@ dataUseCase_OM = pd.read_csv(csv_file_path_OM)
 P_Pcc="gFM_VSM_cc.measurementPcc.PGenPu"
 
 #filtering times
-TimeInit=9
-TimeFinal=11
+TimeInit=10
+TimeFinal=15
 
-TimeInit=4
-TimeFinal=6
 
 #getting time
 t=dataUseCase_OM['time']
@@ -353,9 +351,28 @@ Title =  "P0="+ str(P0) +"pu, SCRinit=" + str(SCR_init) + ", SCRfinal= "+str(SCR
 
 
 
+#Plot EMT
+BaseLocation= "EMTSimulations/Ppos_GFM_EMT_model_P0=0.5.csv"
+csv_file_path_EMT = BaseLocation
+#Name of the Columns
+NameColumnsDataFrame = ["Time","Signal"]
+# Read the CSV file into a DataFrame
+dataUseCase_EMT = pd.read_csv(csv_file_path_EMT)
+# Access the columns
+time1 = dataUseCase_EMT['Time']
+Ppos_GFM_EMT_model = dataUseCase_EMT['Signal']
 
 
-
+#Plot EMT
+BaseLocation= "EMTSimulations/Ppos_GFM_ideal_P0=0.5.csv"
+csv_file_path_EMT = BaseLocation
+#Name of the Columns
+NameColumnsDataFrame = ["Time","Signal"]
+# Read the CSV file into a DataFrame
+dataUseCase_EMT = pd.read_csv(csv_file_path_EMT)
+# Access the columns
+time2 = dataUseCase_EMT['Time']
+Ppos_GFM_ideal = dataUseCase_EMT['Signal']
 
 
 
@@ -414,10 +431,12 @@ df.to_csv(LocationFile, index=False)
 
 # Create the plot
 plt.figure(figsize=(8, 5))  # Set figure size
-plt.plot(t_shifted-1, y_selected, label="P_pcc from RMS simulation", color='b', linestyle='-')  # First plot
+plt.plot(t_shifted, y_selected, label="P_pcc from RMS simulation", color='b', linestyle='-')  # First plot
 plt.plot(t_DeltaP,P_PCC, label="P_PCC analytical", linewidth='3')  # First plot
 plt.plot(t_DeltaP,P_down_finale, label="Pdown_final", linewidth=2)  # First plot
 plt.plot(t_DeltaP,P_up_finale, label="Pup_final", linewidth=2)  # First plot
+plt.plot(time1, Ppos_GFM_EMT_model, label="Ppos_GFM_EMT_model from EMTP", color='gold', linestyle='-')  # EMT plot
+plt.plot(time2, Ppos_GFM_ideal, label="Ppos_GFM_ideal from EMTP", color='red', linestyle='-')  # EMT plot
 # Add labels, title, and legend
 plt.xlabel("sec")
 plt.ylabel("P at PCC (pu)")

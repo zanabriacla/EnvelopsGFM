@@ -167,7 +167,7 @@ def GetEnvelops(MargeUp,MargeDown,DeltaP,Tunnel,TresponseTime,P_PCC):
 
         # t< RoCofStop_Time
         mask = t_DeltaP <= RoCofStop_Time
-        lower_envelope = np.where(mask, DeltaP - Tunnel+P0, lower_envelope)
+        lower_envelope = np.where(mask, DeltaP*(1-MargeDown) - Tunnel+P0, lower_envelope)
         #delay lower_envelope during 10ms only at the beginning after the event
         lower_envelope = np.where(t_DeltaP<RoCofStop_Time, delay_signal(10,fs,lower_envelope), lower_envelope)
 
@@ -237,12 +237,14 @@ def GetEnvelops(MargeUp,MargeDown,DeltaP,Tunnel,TresponseTime,P_PCC):
 #in steady state the value is equal to "0"
 def AddMargin(Signal, initial_margin,InitTime,FinalTime,Tunnel):
 
-     decay_rate = 0.3 # tune this to control how fast the margin narrows
 
      mask=(FinalTime >= t_DeltaP) & (t_DeltaP >= InitTime)
-     # margin = initial_margin * (mask) * np.exp(-decay_rate * t_DeltaP)  + Tunnel
-     margin = np.where(t_DeltaP < InitTime, 0, Signal*mask*(1+initial_margin)*-1)
-     margin = margin + GetValueatSpecificTime(RoCofStop_Time, margin) * -1
+
+    # margin = np.where(t_DeltaP < InitTime, 0, Signal*mask*(1+initial_margin)*-1)
+    # margin = margin + GetValueatSpecificTime(RoCofStop_Time, margin) * -1
+
+     margin = Signal *  initial_margin*mask
+
      # margin = np.where(t_DeltaP < InitTime, 0, np.exp(- (t_DeltaP - InitTime) / decay_rate)*(1+initial_margin)*Signal+(1-np.exp(- (t_DeltaP - InitTime)) / decay_rate)*Tunnel)
 
      # Deactivate only to see the analitical response of Delta¨P
@@ -333,8 +335,8 @@ Xtotal = Xeff + Z_grid  # X total initial that is equal to Xeff+Xgrid inital
 
 #Defining margins for H and D
 
-Ratio_H_D_UP = 0.1 # Use to have two more values for D and H: D*(1+Ratio_H_D_UP), H*(1+Ratio_H_D_UP)
-Ratio_H_D_Down = 0.1 # Use to have two more values for D and H: D*(1-Ratio_H_D_Down), H*(1-Ratio_H_D_Down)
+Ratio_H_D_UP = 0.2 # Use to have two more values for D and H: D*(1+Ratio_H_D_UP), H*(1+Ratio_H_D_UP)
+Ratio_H_D_Down = 0.2 # Use to have two more values for D and H: D*(1-Ratio_H_D_Down), H*(1-Ratio_H_D_Down)
 
 # Defining arrays to consider DeltaP for different H and D
 DeltaP_array = []
@@ -360,7 +362,7 @@ Tunnel_array = [GetTunnel(DeltaPSteadyState_array[i]) for i in range(len(D_array
 TresponseTime=TresponseTime_array[2]
 
 #Creating Envelops
-MargeUp=0.1 # This is the Margin up used in an exponential function around DeltaP
+MargeUp=0.2 # This is the Margin up used in an exponential function around DeltaP
 MargeDown=0.1 # This is the Margin down used in an exponential function around DeltaP
 DeltaP = DeltaP_array[0]
 Tunnel = Tunnel_array[0]

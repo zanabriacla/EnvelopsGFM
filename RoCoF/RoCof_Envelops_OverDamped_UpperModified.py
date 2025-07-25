@@ -291,11 +291,11 @@ def DelayEnvelops(P_up_finale,P_down_finale,P_PCC,shift_Time):
 
     return P_up_finale,P_down_finale,P_PCC
 
-RoCoF = -0.5/50  # Rate of Change of Frequency (Hz/s) ou pu ?
-H = 7     # Inertia constant (s)
+RoCoF = -2/50  # Rate of Change of Frequency (Hz/s) ou pu ?
+H = 6.3    # Inertia constant (s)
 T_pll = 0.01    # PLL time constant (s)
 SCR=2
-D_damping=200#Damping constant of the VSM control
+D_damping=293#Damping constant of the VSM control
 wb=314 # Base angular frequency(rad/s)
 xtr=0.15 #Transformer reactance (pu)
 Ugrid=1 # RMS voltage Ugrid (pu)
@@ -320,7 +320,7 @@ print("Final DeltaP",RoCoF*(2*H+D_damping*T_pll))
 # Define the time vector for simulation
 Start_Time = -1 # sec
 Event_Time=0 #keep this value to "0"
-RoCofDuration=3 # duration of RoCof after that RoCof=0
+RoCofDuration=0.5 # duration of RoCof after that RoCof=0
 RoCofStop_Time= Event_Time+RoCofDuration # sec
 End_Time = 5 # sec
 
@@ -510,7 +510,7 @@ signal = dataUseCase_EMT['Signal']
 
 
 # Create the plot
-Title= "P0="+ str(P0) +", RoCoF=" + str(RoCoF) + ", Duration="+str(RoCofDuration) +"s" +  ", Epsilon= " + str(round(epsilon,3)) + ", ωd= " + ", D= " + str(D_damping) + ", H= " +str(H) + ", Xeff= " + str(Xeff)+ ", EMT=" +str(EMT)
+Title= "P0="+ str(P0) +", RoCoF=" + str(RoCoF) +"pu"+ ", Duration="+str(RoCofDuration) +"s" +  ", Epsilon= " + str(round(epsilon,3)) + ", ωd= " + ", D= " + str(D_damping) + ", H= " +str(H) + ", Xeff= " + str(Xeff)+ ", EMT=" +str(EMT)
 
 plt.figure(figsize=(8, 5))  # Set figure size
 plt.plot(t_shifted-1, y_selected, label="P_pcc from Open Modelica", color='g', linestyle='-')  # First plot

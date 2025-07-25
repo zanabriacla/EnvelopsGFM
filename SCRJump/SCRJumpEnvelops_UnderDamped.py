@@ -78,6 +78,9 @@ def GetEnvelops(MargeUp,MargeDown,Signal,Tunnel,DeltaP):
         mask = (t_DeltaP >= Event_Time) & (t_DeltaP <= End_Time)
         condition = mask & (Signal_down_anal > (Pmax_MoisTunnel))
         Signal_down_anal = np.where(condition, Pmax_MoisTunnel, Signal_down_anal)
+        #Modification of the signal down to consider DeltaP*50% at the beginning
+        P_50Prc = P0 + np.where(t_DeltaP >= Start_Time, DeltaP * 0.5, Signal)
+        Signal_down_anal = EnvelopDowModify(Signal_down_anal, P_50Prc)
 
 
     else:
@@ -91,9 +94,10 @@ def GetEnvelops(MargeUp,MargeDown,Signal,Tunnel,DeltaP):
         mask = (t_DeltaP >= Event_Time) & (t_DeltaP <= End_Time)
         condition = mask & (Signal_up_anal  < (Pmin_MoisTunnel))
         Signal_up_anal = np.where(condition, Pmin_MoisTunnel, Signal_up_anal)
-
-
         Signal_down_anal = Signal * (1 + MargeDown) - Tunnel + P0
+        # Modification of the signal up to consider DeltaP*50% at the beginning
+        P_50Prc = P0 + np.where(t_DeltaP >= Start_Time, DeltaP * 0.5, Signal)
+        Signal_up_anal = EnvelopDowModify(Signal_up_anal, P_50Prc)
 
     Signal_up_anal = Cutsignal(Pmin_,Signal_up_anal,Pmax_)
     Signal_down_anal = Cutsignal(Pmin_, Signal_down_anal, Pmax_)
@@ -102,7 +106,7 @@ def GetEnvelops(MargeUp,MargeDown,Signal,Tunnel,DeltaP):
 
 def EnvelopDowModify(Signal_Down,P_50Prc):
     DeltaTInitToKeepPeakP_50Prc = 0.03  # 50ms we kept the value of P_50Prc after that we consider the value of the PSecond_down_up_anal_array
-    Signal_Down = np.where(t_DeltaP <= Start_Time + 1 +DeltaTInitToKeepPeakP_50Prc, P_50Prc, Signal_Down)
+    Signal_Down = np.where(t_DeltaP <= DeltaTInitToKeepPeakP_50Prc, P_50Prc, Signal_Down)
     return Signal_Down
 
 def LimitingReversePower(P_up_finale,P_down_finale, P0,Tunnel,DeltaP):
@@ -183,7 +187,7 @@ Delta_ZGrid = Z_final-Z_init #DeltaZgrid
 print("DeltaZgrid",Delta_ZGrid)
 
 
-D=100#Damping constant of the VSM control
+D=80#Damping constant of the VSM control
 H=3 #Inertia constant (s)
 wb=314 # Base angular frequency(rad/s)
 xtr=0.06 #Transformer reactance (pu)
@@ -191,7 +195,7 @@ Ugrid=1 # RMS voltage Ugrid (pu)
 Uconv=1 # RMS voltage Uconverter (pu)
 Xeff=0.25 # effective reactance (pu)
 EMT= True # Can be "True" or "False" EMT is activated (20ms for the measures)
-P0= 0.5 # Initial power (pu)
+P0= -0.95 # Initial power (pu)
 Pmax_=1.2 #Pmax
 Pmax_MoisTunnel= Pmax_*0.95 #Pmax
 Pmin_=-1.2 #Pmin
@@ -284,6 +288,7 @@ P_PCC=Cutsignal(Pmin_,P0+DeltaP,Pmax_)
 
 
 #Envelop of 50% of Delta before t=10ms and after that it takes DeltaP
+
 P_50Prc = P0+ np.where(t_DeltaP >= Start_Time, DeltaP*0.5 , DeltaP)
 P_50Prc=Cutsignal(Pmin_,P_50Prc,Pmax_)
 
@@ -314,7 +319,7 @@ P_up_finale = np.nanmax(stacked, axis=0)
 stacked = np.vstack((P_down_anal_array, [P_50Prc],PSecond_down_down_anal_array))
 # Compute the element-wise max, ignoring NaNs
 P_down_finale = np.nanmin(stacked, axis=0)
-P_down_finale= EnvelopDowModify(P_down_finale,P_50Prc)
+
 
 print("P_50Prc",P_50Prc)
 
@@ -331,7 +336,7 @@ if EMT:
     shift_Time = 0
     # Pad with the initial value instead of zero
     initial_value = P_up_finale[0]
-    #P_up_finale = delay_signal(delay_ms, fs, P_up_finale)
+    P_up_finale = delay_signal(delay_ms, fs, P_up_finale)
     P_down_finale = delay_signal(delay_ms, fs, P_down_finale)
     P_PCC = delay_signal(delay_ms, fs, P_PCC)
     P_50Prc = delay_signal(delay_ms, fs, P_50Prc)
@@ -502,12 +507,12 @@ df.to_csv(LocationFile, index=False)
 
 # Create the plot
 plt.figure(figsize=(8, 5))  # Set figure size
-plt.plot(t_shifted-1, y_selected, label="P_pcc from Open Modelica", color='b', linestyle='-')  # Adding simulation
+#plt.plot(t_shifted-1, y_selected, label="P_pcc from Open Modelica", color='b', linestyle='-')  # Adding simulation
 plt.plot(t_DeltaP,P_PCC, label="P_PCC analytical", linewidth='3')  # First plot
 plt.plot(t_DeltaP,P_down_finale, label="Pdown_final", linewidth=2)  # First plot
 plt.plot(t_DeltaP,P_up_finale, label="Pup_final", linewidth=2)  # First plot
-plt.plot(time1, Ppos_GFM_EMT_model, label="Ppos_GFM_EMT_model from EMTP", color='gold', linestyle='-')  # EMT plot
-plt.plot(time2, Ppos_GFM_ideal, label="Ppos_GFM_ideal from EMTP", color='red', linestyle='-')  # EMT plot
+#plt.plot(time1, Ppos_GFM_EMT_model, label="Ppos_GFM_EMT_model from EMTP", color='gold', linestyle='-')  # EMT plot
+#plt.plot(time2, Ppos_GFM_ideal, label="Ppos_GFM_ideal from EMTP", color='red', linestyle='-')  # EMT plot
 # Add labels, title, and legend
 plt.xlabel("sec")
 plt.ylabel("P at PCC (pu)")
@@ -521,7 +526,7 @@ plt.grid(True)  # Add grid for better visualization
 
 # Save the figure with specific size and resolution
 Path = "RMSsimulations/PNGResults/"+Title + ".png"
-#plt.savefig(Path, bbox_inches='tight', dpi=300)
+plt.savefig(Path, bbox_inches='tight', dpi=300)
 
 plt.show()
 

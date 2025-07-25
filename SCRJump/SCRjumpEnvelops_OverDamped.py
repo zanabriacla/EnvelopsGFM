@@ -152,15 +152,15 @@ Delta_ZGrid = Z_final-Z_init #DeltaZgrid
 print("DeltaZgrid",Delta_ZGrid)
 
 
-D=100#Damping constant of the VSM control
-H=3.1 #Inertia constant (s)
+D=80#Damping constant of the VSM control
+H=3 #Inertia constant (s)
 wb=314 # Base angular frequency(rad/s)
 xtr=0.06 #Transformer reactance (pu)
 Ugrid=1 # RMS voltage Ugrid (pu)
 Uconv=1 # RMS voltage Uconverter (pu)
 Xeff=0.25 # effective reactance (pu)
 EMT= True # Can be "True" or "False" EMT is activated (20ms for the measures)
-P0= 0.5 # Initial power (pu)
+P0= 0 # Initial power (pu)
 Pmax_=1.15 #Pmax
 Pmax_MoisTunnel= Pmax_*0.95 #Pmax defined in ENTSOE
 Pmax_MoisTunnel= 1 #Pmax defined by RTE

@@ -10,7 +10,7 @@ from scipy.integrate import quad
 from sympy import symbols, Function, Heaviside
 
 
-
+#The upper value is an exponential that groes from t=RoCofStopTime
 
 def delay_signal(delay_ms,fs,signal):
     delay_samples = int((delay_ms / 1000) * 1 / fs)

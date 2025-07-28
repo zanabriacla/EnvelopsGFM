@@ -71,15 +71,16 @@ def GetEnvelops(MargeUp,MargeDown,Signal,Tunnel,DeltaP):
     # Creating Envelops
     if DeltaPAtEventTime > 0:
         print("DeltaP>0")
-        Signal_up_anal = Signal * (1 + MargeUp) + Tunnel + P0
-        Signal_down_anal = Signal * (1 - MargeDown) - Tunnel + P0
+        mask = (t_DeltaP >= Event_Time) & (t_DeltaP <= End_Time)
+        Signal_up_anal = (Signal * (1 + MargeUp) + Tunnel + P0)
+        Signal_down_anal = (Signal * (1 - MargeDown) - Tunnel + P0)
 
         # Putting a limit to the active power "Signal DOWN"
-        mask = (t_DeltaP >= Event_Time) & (t_DeltaP <= End_Time)
+
         condition = mask & (Signal_down_anal > (Pmax_MoisTunnel))
         Signal_down_anal = np.where(condition, Pmax_MoisTunnel, Signal_down_anal)
         #Modification of the signal down to consider DeltaP*50% at the beginning
-        P_50Prc = P0 + np.where(t_DeltaP >= Start_Time, DeltaP * 0.5, Signal)
+        P_50Prc = P0 + np.where(t_DeltaP >= Event_Time, DeltaP * 0.5+0.005, Signal)
         Signal_down_anal = EnvelopDowModify(Signal_down_anal, P_50Prc)
 
 
@@ -96,7 +97,7 @@ def GetEnvelops(MargeUp,MargeDown,Signal,Tunnel,DeltaP):
         Signal_up_anal = np.where(condition, Pmin_MoisTunnel, Signal_up_anal)
         Signal_down_anal = Signal * (1 + MargeDown) - Tunnel + P0
         # Modification of the signal up to consider DeltaP*50% at the beginning
-        P_50Prc = P0 + np.where(t_DeltaP >= Start_Time, DeltaP * 0.5, Signal)
+        P_50Prc = P0 + np.where(t_DeltaP >= Start_Time, DeltaP * 0.5+0.005, Signal)
         Signal_up_anal = EnvelopDowModify(Signal_up_anal, P_50Prc)
 
     Signal_up_anal = Cutsignal(Pmin_,Signal_up_anal,Pmax_)
@@ -106,7 +107,11 @@ def GetEnvelops(MargeUp,MargeDown,Signal,Tunnel,DeltaP):
 
 def EnvelopDowModify(Signal_Down,P_50Prc):
     DeltaTInitToKeepPeakP_50Prc = 0.03  # 50ms we kept the value of P_50Prc after that we consider the value of the PSecond_down_up_anal_array
-    Signal_Down = np.where(t_DeltaP <= DeltaTInitToKeepPeakP_50Prc, P_50Prc, Signal_Down)
+    mask = (t_DeltaP >= Event_Time) & (t_DeltaP <= Event_Time+DeltaTInitToKeepPeakP_50Prc)
+    Signal_Down = np.where(mask, P_50Prc, Signal_Down)
+    #in case reaching the max value we consider that the envelop that is not saturated will be at the level saturated-0.2pu
+    Signal_Down = np.where(Signal_Down < Pmin_, Pmin_ +0.2, Signal_Down)
+    Signal_Down = np.where(Signal_Down > Pmax_, Pmax_ - 0.2, Signal_Down)
     return Signal_Down
 
 def LimitingReversePower(P_up_finale,P_down_finale, P0,Tunnel,DeltaP):
@@ -139,26 +144,33 @@ def LimitingReversePower(P_up_finale,P_down_finale, P0,Tunnel,DeltaP):
 
 def DelayEnvelops(P_up_finale,P_down_finale,P_PCC,shift_Time):
     TimeTODelay_All_Signals = shift_Time  # ms
-    TimeTODelay_LowerBoundATBeggining = 10  # ms
+    TimeTODelay_ATBegginingms = 10  # ms
 
     P_up_finale = delay_signal(TimeTODelay_All_Signals, fs, P_up_finale)
     P_down_finale = delay_signal(TimeTODelay_All_Signals, fs, P_down_finale)
 
-    P_up_finale = np.where(t_DeltaP < Event_Time, P0 + Tunnel, P_up_finale)
-    P_down_finale = np.where(t_DeltaP < Event_Time, P0 - Tunnel, P_down_finale)
+
+
 
     if (P0 > 0 and DeltaPAtEventTime>0) or (P0 < 0 and DeltaPAtEventTime>0):
 
 
 
         #P down needs to be delayed even more
-        P_down_finale = delay_signal(TimeTODelay_LowerBoundATBeggining, fs, P_down_finale)
+        P_down_finale = delay_signal(TimeTODelay_ATBegginingms, fs, P_down_finale)
 
+        if EMT:
+            #P_up_finale = np.where(t_DeltaP < Event_Time+TimeTODelay_ATBegginingms/1000+delay_EMT_ms/1000, P0 + Tunnel, P_up_finale)
+            P_down_finale = np.where(t_DeltaP < Event_Time+TimeTODelay_ATBegginingms/1000+delay_EMT_ms/1000, P0 - Tunnel, P_down_finale)
 
     else:
 
         # P up needs to be delayed even more
-        P_up_finale = delay_signal(TimeTODelay_LowerBoundATBeggining, fs, P_up_finale)
+        P_up_finale = delay_signal(TimeTODelay_ATBegginingms, fs, P_up_finale)
+
+        if EMT:
+            P_up_finale = np.where(t_DeltaP < Event_Time+TimeTODelay_ATBegginingms/1000+delay_EMT_ms/1000, P0 + Tunnel, P_up_finale)
+            #P_down_finale = np.where(t_DeltaP < Event_Time+TimeTODelay_ATBegginingms/1000+delay_EMT_ms/1000, P0 - Tunnel, P_down_finale)
 
     P_PCC = delay_signal(TimeTODelay_All_Signals, fs, P_PCC)
     P_PCC = np.where(t_DeltaP < Event_Time, P0, P_PCC)
@@ -196,11 +208,11 @@ Uconv=1 # RMS voltage Uconverter (pu)
 Xeff=0.25 # effective reactance (pu)
 EMT= True # Can be "True" or "False" EMT is activated (20ms for the measures)
 P0= -0.95 # Initial power (pu)
-Pmax_=1.2 #Pmax
+Pmax_=1.4 #Pmax
 Pmax_MoisTunnel= Pmax_*0.95 #Pmax
-Pmin_=-1.2 #Pmin
+Pmin_=-1.4 #Pmin
 Pmin_MoisTunnel=Pmin_*0.95
-
+delay_EMT_ms = 20 # 20 ms of delay for EMT simulations
 
 
 
@@ -263,6 +275,7 @@ DeltaP = DeltaP_array[0]
 Tunnel = Tunnel_array[0]
 epsilon = Epsilon_array[0]
 
+#be sure that the value at Event_Time is choosen
 DeltaPAtEventTime = GetValueatSpecificTime(Event_Time+0.01,DeltaP)
 
 results = [GetEnvelops(MargeUp,MargeDown,DeltaP_array[i],Tunnel_array[i],DeltaP) for i in range(len(D_array))]
@@ -332,20 +345,20 @@ print("P_50Prc",P_50Prc)
 #Adding delays when the simulation is done in EMT
 if EMT:
     # Delay settings
-    delay_ms = 20 # 20 ms of delay for EMT simulations
+
     shift_Time = 0
     # Pad with the initial value instead of zero
     initial_value = P_up_finale[0]
-    P_up_finale = delay_signal(delay_ms, fs, P_up_finale)
-    P_down_finale = delay_signal(delay_ms, fs, P_down_finale)
-    P_PCC = delay_signal(delay_ms, fs, P_PCC)
-    P_50Prc = delay_signal(delay_ms, fs, P_50Prc)
+    P_up_finale = delay_signal(delay_EMT_ms, fs, P_up_finale)
+    P_down_finale = delay_signal(delay_EMT_ms, fs, P_down_finale)
+    P_PCC = delay_signal(delay_EMT_ms, fs, P_PCC)
+    P_50Prc = delay_signal(delay_EMT_ms, fs, P_50Prc)
 
 
-    results = [delay_signal(delay_ms,fs, P_up_anal_array[i]) for i in range(len(D_array))]
+    results = [delay_signal(delay_EMT_ms,fs, P_up_anal_array[i]) for i in range(len(D_array))]
     P_up_anal_array = results
     print("size P_up_anal_array:", len(P_up_anal_array))
-    results = [delay_signal(delay_ms,fs, P_down_anal_array[i]) for i in range(len(D_array))]
+    results = [delay_signal(delay_EMT_ms,fs, P_down_anal_array[i]) for i in range(len(D_array))]
     #P_down_anal_array = map(np.array, zip(*results))
     P_down_anal_array = results
 

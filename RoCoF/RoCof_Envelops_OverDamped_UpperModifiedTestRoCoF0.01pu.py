@@ -10,9 +10,7 @@ from scipy.integrate import quad
 from sympy import symbols, Function, Heaviside
 
 
-
-#instead of an exponential that groes from the steady state value of the signal at t = RoCofTime stop
-#the upper boudn is modified to consider the value of P once the RoCoF is stopped + DeltaP*Margin
+#Code to test the results from OpenModelica and EMTP
 
 def delay_signal(delay_ms,fs,signal):
     delay_samples = int((delay_ms / 1000) * 1 / fs)
@@ -297,9 +295,9 @@ RoCoF = -0.5/50  # Rate of Change of Frequency (Hz/s) ou pu ?
 H = 7    # Inertia constant (s)
 T_pll = 0.01    # PLL time constant (s)
 SCR=2
-D_damping=200#Damping constant of the VSM control
+D_damping=282#Damping constant of the VSM control
 wb=314 # Base angular frequency(rad/s)
-xtr=0.06 #Transformer reactance (pu)
+xtr=0.15 #Transformer reactance (pu)
 Ugrid=1 # RMS voltage Ugrid (pu)
 Uconv=1 # RMS voltage Uconverter (pu)
 Xeff=0.25 # effective reactance (pu)
@@ -322,7 +320,7 @@ print("Final DeltaP",RoCoF*(2*H+D_damping*T_pll))
 # Define the time vector for simulation
 Start_Time = -1 # sec
 Event_Time=0 #keep this value to "0"
-RoCofDuration=3 # duration of RoCof after that RoCof=0
+RoCofDuration=5 # duration of RoCof after that RoCof=0
 RoCofStop_Time= Event_Time+RoCofDuration # sec
 End_Time = 5 # sec
 
@@ -452,8 +450,7 @@ csv_file_path_OM = BaseLocation + "P0=0.95,RoCoF=0.01,DeltaT=3s,H=2.2,D=133,Xeff
 #csv_file_path_OM = BaseLocation + "P0=0.5,RoCoF=-0.01,DeltaT=3s,H=2.2,KPowerDamping=25,KAngleDamping=26,Xeff=0.25,Imax=1.2,P0=0.5,SCR=20,Imax=1.2.csv"
 csv_file_path_OM = BaseLocation + "P0=0.5,RoCoF=-0.05,DeltaT=0.5s,H=2.2,KPowerDamping=25,KAngleDamping=26,Xeff=0.25,Imax=1.2,P0=0.5,SCR=20,Imax=1.2.csv"
 csv_file_path_OM = BaseLocation + "P0=0.5,RoCoF=-0.01,DeltaT=3s,H=7,D=200,Xeff=0.25,Imax=1.2,P0=0.5,SCR=20,Imax=1.2.csv"
-csv_file_path_OM =  BaseLocation + "Rocof_0.01_H3_D200_SCR2_H7.csv"
-csv_file_path_OM =  BaseLocation + "UNIFI_H=2.2P0=0.5RoCoF=0.04puXeff=0.25DampAng=25DampPow26.csv"
+csv_file_path_OM =  BaseLocation + "UNIFI_H=2.2P0=0.5RoCoF=0.01puXeff=0.25DampAng=25DampPow26.csv"
 #Name of the Columns
 NameColumnsDataFrame = ["Time","Pup","Pdown"]
 # Read the CSV file into a DataFrame
@@ -501,8 +498,7 @@ axisX = filtered_dataUseCase_OM['time']
 #BaseLocation= "EMTSimulations/RoCof=0.01,P0=0.5,Duration=3s.csv"
 BaseLocation= "EMTSimulations/RoCof=0.05,P0=0.5,Duration=0.5s.csv"
 BaseLocation= "EMTSimulations/RoCof=0.01,P0=0.5,Duration=3s.csv"
-BaseLocation= "EMTSimulations/RoCof=0.04,P0=0.5,Duration=500ms.csv"
-
+#BaseLocation= "EMTSimulations/RoCof=0.04,P0=0.5,Duration=500ms.csv"
 #OverDAMPED
 csv_file_path_EMT = BaseLocation
 #Name of the Columns
@@ -573,7 +569,7 @@ plt.plot(t_DeltaP,P_PCC, label="P_PCC analytical", linewidth='3')  # First plot
 plt.plot(time, signal, label="P_pcc from EMTP", color='gold', linestyle='-')  # EMT plot
 plt.plot(t_DeltaP,P_down_finale, label="Pdown_final", linewidth=2)  # First plot
 plt.plot(t_DeltaP,P_up_finale, label="Pup_final", linewidth=2)  # First plot
-plt.plot(t_shifted-1, y_selected, label="P_pcc from Open Modelica", color='b', linestyle='-')  # First plot
+plt.plot(t_shifted-1, y_selected, label="P_pcc from Open Modelica-UNIFI model", color='b', linestyle='-')  # First plot
 
 # Add labels, title, and legend
 plt.xlabel("sec")

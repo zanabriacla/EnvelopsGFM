@@ -160,11 +160,11 @@ Ugrid=1 # RMS voltage Ugrid (pu)
 Uconv=1 # RMS voltage Uconverter (pu)
 Xeff=0.25 # effective reactance (pu)
 EMT= True # Can be "True" or "False" EMT is activated (20ms for the measures)
-P0= 0 # Initial power (pu)
-Pmax_=1.15 #Pmax
+P0= 0.95 # Initial power (pu)
+Pmax_=1.4 #Pmax
 Pmax_MoisTunnel= Pmax_*0.95 #Pmax defined in ENTSOE
 Pmax_MoisTunnel= 1 #Pmax defined by RTE
-Pmin_=-1.15 #Pmin
+Pmin_=-1.4 #Pmin
 Pmin_MoisTunnel= Pmin_*0.95 #Pmax defined in ENTSOE
 Pmin_MoisTunnel=-1 #Pmax defined by RTE
 

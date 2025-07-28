@@ -294,7 +294,7 @@ def DelayEnvelops(P_up_finale,P_down_finale,P_PCC,shift_Time):
 
     return P_up_finale,P_down_finale,P_PCC
 
-RoCoF = 2/50  # Rate of Change of Frequency (Hz/s) ou pu ?
+RoCoF = -2/50  # Rate of Change of Frequency (Hz/s) ou pu ?
 H = 3    # Inertia constant (s)
 T_pll = 0.01    # PLL time constant (s)
 SCR=10
@@ -305,7 +305,7 @@ Ugrid=1 # RMS voltage Ugrid (pu)
 Uconv=1 # RMS voltage Uconverter (pu)
 Xeff=0.25 # effective reactance (pu)
 EMT= True # Can be "True" or "False" EMT is activated (20ms for the measures)
-P0= -0.95 # Initial power (pu)
+P0= 0.5 # Initial power (pu)
 Pmax_=1.2 #Pmax
 Pmin_=-1.2 #Pmin
 Pmax_MoisTunnel= Pmax_*0.95 #Considered for current limitation
@@ -455,6 +455,7 @@ csv_file_path_OM = BaseLocation + "P0=0.5,RoCoF=-0.05,DeltaT=0.5s,H=2.2,KPowerDa
 csv_file_path_OM = BaseLocation + "P0=0.5,RoCoF=-0.01,DeltaT=3s,H=7,D=200,Xeff=0.25,Imax=1.2,P0=0.5,SCR=20,Imax=1.2.csv"
 csv_file_path_OM =  BaseLocation + "Rocof_0.01_H3_D200_SCR2_H7.csv"
 csv_file_path_OM =  BaseLocation + "UNIFI_H=2.2P0=0.5RoCoF=0.04puXeff=0.25DampAng=25DampPow26.csv"
+csv_file_path_OM = BaseLocation + "UNIFI_H=1.5P0=0.5RoCoF=-0.04Last500mspuXeff=0.25DampAng=26DampPow10.csv"
 #Name of the Columns
 NameColumnsDataFrame = ["Time","Pup","Pdown"]
 # Read the CSV file into a DataFrame
@@ -569,12 +570,12 @@ df.to_csv(LocationFile, index=False)
 
 # Create the plot
 plt.figure(figsize=(8, 5))  # Set figure size
-plt.axhline(y=0.66, color='red', linestyle='--', label='Pfinal required')
+#plt.axhline(y=0.66, color='red', linestyle='--', label='Pfinal required')
 plt.plot(t_DeltaP,P_PCC, label="P_PCC analytical", linewidth='3')  # First plot
 #plt.plot(time, signal, label="P_pcc from EMTP", color='gold', linestyle='-')  # EMT plot
 plt.plot(t_DeltaP,P_down_finale, label="Pdown_final", linewidth=2)  # First plot
 plt.plot(t_DeltaP,P_up_finale, label="Pup_final", linewidth=2)  # First plot
-#plt.plot(t_shifted-1, y_selected, label="P_pcc from Open Modelica", color='b', linestyle='-')  # First plot
+plt.plot(t_shifted-1, y_selected, label="P_pcc from Open Modelica", color='b', linestyle='-')  # First plot
 
 # Add labels, title, and legend
 plt.xlabel("sec")

@@ -14,6 +14,7 @@ def delay_signal(delay_ms,fs,signal):
     signal_delayed = np.concatenate((np.full(delay_samples, signal[0]), signal))[:len(signal)]
     return signal_delayed
 
+#DeltaP fonction in case of SCR jump, we return also Ppeak, epsilon and two exponential up (DeltaP_up_anal_array) and low (DeltaP_down_anal_array)
 def GetDeltaP(D,H,Xtotal_initial,P0):
     print("Second Order Function UNDER DAMPED")
     # second Order system
@@ -55,10 +56,12 @@ def GetDeltaP(D,H,Xtotal_initial,P0):
     DeltaP_down_anal_array = np.where(t_DeltaP < Event_Time, 0, DeltaP_down_anal_array)
     return DeltaP,Ppeak,epsilon, DeltaP_up_anal_array, DeltaP_down_anal_array
 
+#The tunnel to be considered at the end is either 0.02In or 5% of Ppeak
 def GetTunnel(Ppeak):
     Tunnel = max(0.02, 0.05 * Ppeak) # For the tunnel we need to take the max between 0.02In and 5%DeltaP (at
     return Tunnel
 
+#A Signal is cutted bettwen a max value and a min value
 def Cutsignal(Valuemin,Signal,Valuemax):
     Signal = np.where(Signal < Valuemin, Valuemin, Signal)
     Signal = np.where(Signal > Valuemax, Valuemax, Signal)
@@ -66,19 +69,30 @@ def Cutsignal(Valuemin,Signal,Valuemax):
     print("Value Max:======", Valuemax,"-")
     return Signal
 
+# The upper and lower envelopes are defined here.
+# For DeltaP > 0, the upper bound is calculated as: (DeltaP * (1 + MarginUp) + Tunnel + P0).
+# The lower bound is calculated as: (DeltaP * (1 - MargeDown) - Tunnel + P0)
+# The lower bound follows an exponential behavior, but this is not applied during the initial instants.
+# The DeltaP input corresponds to DeltaP in the case of D and H base variants.
+# It is important to use 50% of the DeltaP value at the beginning of the response to reflect the expected behavior.
+# Note: 'Signal' refers to the DeltaP input for both D and H variants.
+
 def GetEnvelops(MargeUp,MargeDown,Signal,Tunnel,DeltaP):
 
     # Creating Envelops
     if DeltaPAtEventTime > 0:
         print("DeltaP>0")
-        mask = (t_DeltaP >= Event_Time) & (t_DeltaP <= End_Time)
+        # upper and lower bound built from the MargeUp and MargeDown values
         Signal_up_anal = (Signal * (1 + MargeUp) + Tunnel + P0)
         Signal_down_anal = (Signal * (1 - MargeDown) - Tunnel + P0)
 
-        # Putting a limit to the active power "Signal DOWN"
-
+        # Apply a limit to the active power "Signal DOWN" when it exceeds Pmax_Mois_Tunnel.
+        # This ensures that the upper and lower bounds are not confused in cases of saturation,
+        # and maintains a margin between the bounds for better distinction and stability.
+        mask = (t_DeltaP >= Event_Time) & (t_DeltaP <= End_Time)
         condition = mask & (Signal_down_anal > (Pmax_MoisTunnel))
         Signal_down_anal = np.where(condition, Pmax_MoisTunnel, Signal_down_anal)
+
         #Modification of the signal down to consider DeltaP*50% at the beginning
         P_50Prc = P0 + np.where(t_DeltaP >= Event_Time, DeltaP * 0.5+0.005, Signal)
         Signal_down_anal = EnvelopDowModify(Signal_down_anal, P_50Prc)
@@ -86,24 +100,36 @@ def GetEnvelops(MargeUp,MargeDown,Signal,Tunnel,DeltaP):
 
     else:
         print("DeltaP<=0")
-        #Signal_up_anal = Signal * (1 - MargeUp) + Tunnel + P0
-
+        # upper and lower bound built from the MargeUp and MargeDown values
         Signal_up_anal = Signal * (1 - MargeUp) + Tunnel + P0
+        Signal_down_anal = Signal * (1 + MargeDown) - Tunnel + P0
 
-        # Putting a limit to the active power "SIGNAL UP"
+        # Apply a limit to the active power "Signal UP" when it is lower than Pmin_MoisTunnel.
+        # This ensures that the upper and lower bounds are not confused in cases of saturation,
+        # and maintains a margin between the bounds for better distinction and stability.
 
         mask = (t_DeltaP >= Event_Time) & (t_DeltaP <= End_Time)
         condition = mask & (Signal_up_anal  < (Pmin_MoisTunnel))
         Signal_up_anal = np.where(condition, Pmin_MoisTunnel, Signal_up_anal)
-        Signal_down_anal = Signal * (1 + MargeDown) - Tunnel + P0
+
+
+
         # Modification of the signal up to consider DeltaP*50% at the beginning
         P_50Prc = P0 + np.where(t_DeltaP >= Start_Time, DeltaP * 0.5+0.005, Signal)
         Signal_up_anal = EnvelopDowModify(Signal_up_anal, P_50Prc)
+
+    #Limiting upper bound to Pmin and Pmax
+    #Limiting lower bound to Pmin and Pmax
 
     Signal_up_anal = Cutsignal(Pmin_,Signal_up_anal,Pmax_)
     Signal_down_anal = Cutsignal(Pmin_, Signal_down_anal, Pmax_)
     print(type(Signal_up_anal),"the type of up_anal")
     return Signal_up_anal,Signal_down_anal
+
+# In the case of a positive DeltaP, we need to account for the fact that DeltaP increases during the initial moment.
+# This is why we do not immediately apply the exponential decay, as it would not reflect the expected behavior.
+# Instead, we hold DeltaP at 50% of its value for a duration defined by "DeltaTInitToKeepPeakP_50Prc",
+# before transitioning to the lower exponential decay.
 
 def EnvelopDowModify(Signal_Down,P_50Prc):
     DeltaTInitToKeepPeakP_50Prc = 0.03  # 50ms we kept the value of P_50Prc after that we consider the value of the PSecond_down_up_anal_array
@@ -141,6 +167,12 @@ def LimitingReversePower(P_up_finale,P_down_finale, P0,Tunnel,DeltaP):
                  linestyle='-')  # Adding simulation
 
         return P_up_finale,P_down_finale
+
+# At the beginning of the simulation, we need to account for measurement delays—even when simulations are performed in RMS mode.
+# In this case, we apply a delay equal to "TimeTODelay_ATBeginningms".
+# For EMT simulations, the total delay is "TimeTODelay_ATBeginningms" plus "delay_EMT_ms".
+# In EMT mode, measurements follow the IEC 61400-21-1 standard, where a filter is applied to extract the positive sequence values,
+# with a typical window duration of 20 ms.
 
 def DelayEnvelops(P_up_finale,P_down_finale,P_PCC,shift_Time):
     TimeTODelay_All_Signals = shift_Time  # ms
@@ -275,8 +307,9 @@ DeltaP = DeltaP_array[0]
 Tunnel = Tunnel_array[0]
 epsilon = Epsilon_array[0]
 
-#be sure that the value at Event_Time is choosen
+#We get the value of P at Event_Time + DeltaSmallT
 DeltaPAtEventTime = GetValueatSpecificTime(Event_Time+0.01,DeltaP)
+
 
 results = [GetEnvelops(MargeUp,MargeDown,DeltaP_array[i],Tunnel_array[i],DeltaP) for i in range(len(D_array))]
 results_PSecond_up_anal_array= [GetEnvelops(MargeUp,MargeDown,DeltaPSecond_up_anal_array[i],Tunnel_array[i],DeltaP) for i in range(len(D_array))]
@@ -284,24 +317,28 @@ results_PSecond_down_anal_array= [GetEnvelops(MargeUp,MargeDown,DeltaPSecond_dow
 
 
 
-#Second order limit
+#the reponse is based on DeltaP
 P_up_anal_array, P_down_anal_array = map(np.array, zip(*results))
-#First order limit for P up
+# The response is based on DeltaPSecond_up_anal_array, representing the upper exponential behavior.
+# This applies in the case where DeltaP > 0.
+# Both the upper and lower bounds of the response are calculated as follows:
+# PSecond_up_up_anal_array   = (DeltaPSecond_up_anal_array * (1 + MarginUp) + Tunnel + P0)
+# PSecond_up_down_anal_array = (DeltaPSecond_up_anal_array * (1 + MarginUp) + Tunnel + P0)
+# A modification to PSecond_up_down_anal_array is done as clarified in "GetEnvelops"
 PSecond_up_up_anal_array, PSecond_up_down_anal_array = map(np.array, zip(*results_PSecond_up_anal_array))
-#First order limit for P down
+# The response is based on DeltaPSecond_down_anal_array, representing the lower exponential behavior.
+# This applies in the case where DeltaP > 0.
+# Both the upper and lower bounds of the response are calculated as follows:
+# PSecond_down_up_anal_array   = (DeltaPSecond_down_anal_array * (1 + MarginUp) + Tunnel + P0)
+# PSecond_down_down_anal_array = (DeltaPSecond_down_anal_array * (1 + MarginUp) + Tunnel + P0)
+# A modification to PSecond_up_down_anal_array is done as clarified in "GetEnvelops"
 PSecond_down_up_anal_array, PSecond_down_down_anal_array  = map(np.array, zip(*results_PSecond_down_anal_array))
 
 
 
-#Theoretical Value
-#P_PCC= P0+DeltaP
+#P_PCC is limited to Pmin and Pmax , is calculated here to be plot as the expected analytical behavior
 P_PCC=Cutsignal(Pmin_,P0+DeltaP,Pmax_)
-#P_PCC = np.where(P_PCC < -1, -1, P_PCC)
-
-
-
-#Envelop of 50% of Delta before t=10ms and after that it takes DeltaP
-
+#Calculating 50% of P_PCC
 P_50Prc = P0+ np.where(t_DeltaP >= Start_Time, DeltaP*0.5 , DeltaP)
 P_50Prc=Cutsignal(Pmin_,P_50Prc,Pmax_)
 
@@ -310,25 +347,23 @@ P_50Prc=Cutsignal(Pmin_,P_50Prc,Pmax_)
 print("Start_Time+0.2",Start_Time+0.2)
 
 
-#From different possibilities , we select the max value for Envelop UP and the MIN value for envelop DOWN
-#P_up_finale = np.maximum(P_up_anal_array[0], P_up_anal_array[1],P_50Prc)
-
-# Element-wise max across all
-
-
-#P_up_finale = np.maximum.reduce(P_up_anal_array + [P_50Prc])
-#P_down_finale = np.minimum.reduce(P_down_anal_array + [P_50Prc])
 
 
 # Stack the arrays into a 2D NumPy array
-#stacked = np.vstack((P_up_anal_array , [P_50Prc], P_up_anal_array, Cutsignal(Pmin_,PSecond_up_anal_array,Pmax_), Cutsignal(Pmin_,PSecond_down_anal_array,Pmax_) ))
+# Selecting the maximum value among P_up_anal_array, [P_50Prc], PSecond_up_up_anal_array
+# I don't believe we still need P_up_anal_array or P_50Prc,
+# but I’ve left them in place to avoid re-testing the entire workflow at this stage.
+
 stacked = np.vstack(( P_up_anal_array, [P_50Prc], PSecond_up_up_anal_array ))
 # Compute the element-wise max, ignoring NaNs
 P_up_finale = np.nanmax(stacked, axis=0)
 
 
 # Stack the arrays into a 2D NumPy array
-#stacked = np.vstack((P_down_anal_array , [P_50Prc], P_up_anal_array, PSecond_up_anal_array, PSecond_down_anal_array ))
+# Selecting the minimum value among P_down_anal_array, [P_50Prc], PSecond_down_down_anal_array
+# I don't believe we still need P_down_anal_array or P_50Prc,
+# but I’ve left them in place to avoid re-testing the entire workflow at this stage.
+
 stacked = np.vstack((P_down_anal_array, [P_50Prc],PSecond_down_down_anal_array))
 # Compute the element-wise max, ignoring NaNs
 P_down_finale = np.nanmin(stacked, axis=0)
@@ -336,13 +371,10 @@ P_down_finale = np.nanmin(stacked, axis=0)
 
 print("P_50Prc",P_50Prc)
 
-
-
 #cutting Pdown finale and Pup finale in order to avoir reverse power
-
 #P_up_finale ,  P_down_finale = LimitingReversePower(P_up_finale,P_down_finale, P0,Tunnel,DeltaP)
 
-#Adding delays when the simulation is done in EMT
+#Adding delays "delay_EMT_ms" when the simulation is done in EMT
 if EMT:
     # Delay settings
 

@@ -3,7 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # Load the .mat file
-data = loadmat('/home/claudia/Documents/Scripts_GFM/DevPython/Git_Repo_GFM_Envelops/EnvelopsGFM/RoCoF/EMTSimulations/RoCoF_responses_2Hz_s (1).mat')
+data = loadmat('/home/claudia/Documents/Scripts_GFM/DevPython/Git_Repo_GFM_Envelops/EnvelopsGFM/RoCoF/EMTSimulations/P0=0.5, RoCoF=0.01pu, Duration=3s, Epsilon= 1.363, Ï‰d= , D= 200, H= 3, Xeff= 0.25, EMT=True.mat')
 
 # View the keys (variables in the file)
 print(data.keys())

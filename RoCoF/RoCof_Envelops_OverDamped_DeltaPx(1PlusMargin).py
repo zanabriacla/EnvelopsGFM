@@ -294,8 +294,8 @@ def DelayEnvelops(P_up_finale,P_down_finale,P_PCC,shift_Time):
 
     return P_up_finale,P_down_finale,P_PCC
 
-RoCoF = -2/50  # Rate of Change of Frequency (Hz/s) ou pu ?
-H = 3    # Inertia constant (s)
+RoCoF = -0.5/50  # Rate of Change of Frequency (Hz/s) ou pu ?
+H = 3   # Inertia constant (s)
 T_pll = 0.01    # PLL time constant (s)
 SCR=10
 D_damping=200#Damping constant of the VSM control

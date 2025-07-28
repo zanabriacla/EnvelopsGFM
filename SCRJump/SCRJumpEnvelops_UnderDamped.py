@@ -94,6 +94,9 @@ def GetEnvelops(MargeUp,MargeDown,Signal,Tunnel,DeltaP):
         Signal_down_anal = np.where(condition, Pmax_MoisTunnel, Signal_down_anal)
 
         #Modification of the signal down to consider DeltaP*50% at the beginning
+        # Adding 0.005, If DeltaP = 0 and the power was previously at P = 0.02, the power is reduced back to 0.
+        # This prevents an unintended power offset from being retained when no DeltaP is applied.
+
         P_50Prc = P0 + np.where(t_DeltaP >= Event_Time, DeltaP * 0.5+0.005, Signal)
         Signal_down_anal = EnvelopDowModify(Signal_down_anal, P_50Prc)
 
@@ -231,7 +234,7 @@ Delta_ZGrid = Z_final-Z_init #DeltaZgrid
 print("DeltaZgrid",Delta_ZGrid)
 
 
-D=80#Damping constant of the VSM control
+D=50#Damping constant of the VSM control
 H=3 #Inertia constant (s)
 wb=314 # Base angular frequency(rad/s)
 xtr=0.06 #Transformer reactance (pu)
@@ -239,7 +242,7 @@ Ugrid=1 # RMS voltage Ugrid (pu)
 Uconv=1 # RMS voltage Uconverter (pu)
 Xeff=0.25 # effective reactance (pu)
 EMT= True # Can be "True" or "False" EMT is activated (20ms for the measures)
-P0= -0.95 # Initial power (pu)
+P0= 0 # Initial power (pu)
 Pmax_=1.4 #Pmax
 Pmax_MoisTunnel= Pmax_*0.95 #Pmax
 Pmin_=-1.4 #Pmin

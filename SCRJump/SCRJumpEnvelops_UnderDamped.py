@@ -7,7 +7,10 @@ import numpy as np
 
 
 
-
+# For DeltaP > 0,
+# The upper bound is an exponential envelop
+# The lower bound follows an exponential behavior, but this is not applied during the initial instants.
+# Instead 50% of the expected response is applied during xx ms and then the lower bound exponential behavior is considered
 
 def delay_signal(delay_ms,fs,signal):
     delay_samples = int((delay_ms / 1000) * 1 / fs)
@@ -70,11 +73,12 @@ def Cutsignal(Valuemin,Signal,Valuemax):
     return Signal
 
 # The upper and lower envelopes are defined here.
-# For DeltaP > 0, the upper bound is calculated as: (DeltaP * (1 + MarginUp) + Tunnel + P0).
-# The lower bound is calculated as: (DeltaP * (1 - MargeDown) - Tunnel + P0)
-# The lower bound follows an exponential behavior, but this is not applied during the initial instants.
-# The DeltaP input corresponds to DeltaP in the case of D and H base variants.
+# For DeltaP > 0,
+# The upper bound is calculated as: (DeltaP * (1 + MarginUp) + Tunnel + P0).
+# The Lower bound is calculated as: (DeltaP * (1 - MargeDown) - Tunnel + P0)
 # It is important to use 50% of the DeltaP value at the beginning of the response to reflect the expected behavior.
+# Note input parameters:
+# The DeltaP input corresponds to DeltaP in the case of D and H base variants.
 # Note: 'Signal' refers to the DeltaP input for both D and H variants.
 
 def GetEnvelops(MargeUp,MargeDown,Signal,Tunnel,DeltaP):
@@ -314,9 +318,11 @@ epsilon = Epsilon_array[0]
 #We get the value of P at Event_Time + DeltaSmallT
 DeltaPAtEventTime = GetValueatSpecificTime(Event_Time+0.01,DeltaP)
 
-
+#Get margin for the expected DeltaP behavior
 results = [GetEnvelops(MargeUp,MargeDown,DeltaP_array[i],Tunnel_array[i],DeltaP) for i in range(len(D_array))]
+# Get margin for the upper exponential envelop DeltaPSecond_up_anal_array
 results_PSecond_up_anal_array= [GetEnvelops(MargeUp,MargeDown,DeltaPSecond_up_anal_array[i],Tunnel_array[i],DeltaP) for i in range(len(D_array))]
+# Get margin for the lower exponential envelop DeltaPSecond_down_anal_array
 results_PSecond_down_anal_array= [GetEnvelops(MargeUp,MargeDown,DeltaPSecond_down_anal_array[i],Tunnel_array[i],DeltaP) for i in range(len(D_array))]
 
 

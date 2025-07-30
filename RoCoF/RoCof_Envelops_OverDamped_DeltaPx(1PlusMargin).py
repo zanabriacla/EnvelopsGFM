@@ -315,7 +315,7 @@ def DelayEnvelops(P_up_finale,P_down_finale,P_PCC,shift_Time):
 
     return P_up_finale,P_down_finale,P_PCC
 
-RoCoF = -0.5/50  # Rate of Change of Frequency (Hz/s) ou pu ?
+RoCoF = -0.5/50  # Rate of Change of Frequency pu ?
 H = 3   # Inertia constant (s)
 T_pll = 0.01    # PLL time constant (s)
 SCR=10

@@ -311,8 +311,8 @@ Z_init=1/SCR_init
 
 
 
-RoCoF = -0.5/50  # Rate of Change of Frequency (Hz/s) ou pu ?
-D=50#Damping constant of the VSM control
+RoCoF = 0.5/50  # Rate of Change of Frequency pu
+D=80#Damping constant of the VSM control
 H=3 #Inertia constant (s)
 t_pll = 0.01    # PLL time constant (s)
 wb=314 # Base angular frequency(rad/s)
@@ -321,7 +321,7 @@ Ugrid=1 # RMS voltage Ugrid (pu)
 Uconv=1 # RMS voltage Uconverter (pu)
 Xeff=0.25 # effective reactance (pu)
 EMT= True # Can be "True" or "False" EMT is activated (20ms for the measures)
-P0= 0 # Initial power (pu)
+P0= -0.95 # Initial power (pu)
 Pmax_=1.4 #Pmax
 Pmax_MoisTunnel= Pmax_*0.95 #Pmax
 Pmin_=-1.4 #Pmin
@@ -505,9 +505,9 @@ shift_Time= 0
 # Create the plot
 plt.figure(figsize=(8, 5))  # Set figure size
 
-plt.plot(t_DeltaP+shift_Time,DeltPUperExpBound, label="UperBound", color='r', linestyle=':')  # First plot
-plt.plot(t_DeltaP+shift_Time,DeltPLowerExpBound, label="LowerBound", color='r', linestyle='-')  # First plot
-plt.plot(t_DeltaP+shift_Time,DeltaP, label="DeltaP", color='r', linestyle='-')  # First plot
+plt.plot(t_DeltaP+shift_Time,DeltPUperExpBound+P0, label="UperBound", color='green', linestyle=':')  # First plot
+plt.plot(t_DeltaP+shift_Time,DeltPLowerExpBound+P0, label="LowerBound", color='orange', linestyle='-')  # First plot
+plt.plot(t_DeltaP+shift_Time,DeltaP+P0, label="DeltaP", color='r', linestyle='-')  # First plot
 
 
 # Add vertical line at t = 10 seconds

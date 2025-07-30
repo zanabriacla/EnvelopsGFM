@@ -14,47 +14,131 @@ def delay_signal(delay_ms,fs,signal):
     signal_delayed = np.concatenate((np.full(delay_samples, signal[0]), signal))[:len(signal)]
     return signal_delayed
 
-#DeltaP fonction in case of SCR jump, we return also Ppeak, epsilon and two exponential up (DeltaP_up_anal_array) and low (DeltaP_down_anal_array)
-def GetDeltaP(D,H,Xtotal_initial,P0):
-    print("Second Order Function UNDER DAMPED")
-    # second Order system
-    # Calculating the epsilon and Wn of the second order ystsem
+def GetDeltaP(D_Damping,H,Xtotal_initial,P0):
 
-    wn = math.sqrt(wb * Uconv * Ugrid / (2 * H * Xtotal_initial))
-    epsilon = D / (4 * H * wn)
+
+
+    DeltaP = np.zeros_like(t_DeltaP)
+    DeltaP, xi ,TresponseTime = GetDeltaP_NotDELAYED(D_Damping, H, Xtotal_initial, P0, t_DeltaP)  # <-- your actual function here
+
+
+
+    DeltaP=np.where(Event_Time<t_DeltaP ,DeltaP,0)
+    DeltaPSteadyState = DeltaP[-1] #Ppeak is the
+
+
+    DeltaP_Recovered = GetDeltaP_NotDELAYED(D_Damping, H, Xtotal_initial, P0, t_DeltaP-RoCofStop_Time)[0]*-1
+    DeltaP_Recovered = np.where(RoCofStop_Time < t_DeltaP, DeltaP_Recovered, 0)
+
+    DeltaP= DeltaP + DeltaP_Recovered
+    DeltaP=DeltaP*-1
+
+
+
+
+
+    print("PsteadyState",DeltaPSteadyState)
+    return DeltaP,DeltaPSteadyState,xi,TresponseTime
+
+def GetDeltaP_NotDELAYED(D_Damping,H,x_total_initial,P0,t_DeltaP):
+
+    epsilon = (D / 2 * np.sqrt(x_total_initial / (2 * H * wb * u_prod)) )
+    wn = np.sqrt(wb * u_prod / (2 * H * x_total_initial))
+
+    wd = wn * np.sqrt(1 - epsilon ** 2)
+
+
+    alpha = 2 * H * t_pll * RoCoF
+    beta = (2 * H + D * t_pll) / (2 * H * t_pll)
+
+    A_coeff = alpha * beta
+    common_denom = 1 - 2 * epsilon * wn * t_pll + wn ** 2 * t_pll ** 2
+    B_coeff = -(t_pll ** 2 * alpha * wn ** 2 * (t_pll * beta - 1)) / common_denom
+    C_coeff = (alpha * (2 * t_pll * beta * epsilon * wn - t_pll * wn ** 2 - beta)) / common_denom
+    D_coeff = (
+                      alpha
+                      * (
+                              4 * t_pll * beta * wn ** 2 * epsilon ** 2
+                              - t_pll * beta * wn ** 2
+                              - 2 * t_pll * wn ** 3 * epsilon
+                              - 2 * beta * wn * epsilon
+                              + wn ** 2
+                      )
+              ) / common_denom
+
+    term2 = np.exp(-t_DeltaP / t_pll)
+    term3 = np.exp(-epsilon * wn * t_DeltaP) * np.cos(wd * t_DeltaP)
+    term4 = np.exp(-epsilon * wn * t_DeltaP) * np.sin(wd * t_DeltaP)
+
+    delta_p1 = (
+            A_coeff
+            + B_coeff / t_pll * term2
+            + C_coeff * term3
+            + C_coeff * (D_coeff / C_coeff - epsilon * wn) / wd * term4
+    )
+    print("A_coeff",A_coeff)
+    print("B_coeff", B_coeff)
+    print("C_coeff", C_coeff)
+    print("D_coeff", D_coeff)
     print("epsilon", epsilon)
-    wd = wn * math.sqrt(1 - epsilon ** 2)
+    print("wd", wd)
+    print("wn", wn)
 
-    print("epsilon: ", epsilon, "natural frequency: ", wn, "Damped natural frequency: ", wd)
+    C2_coeff = (D_coeff-C_coeff*epsilon*wn)/wd
+    R_coeff = np.sqrt(C_coeff ** 2 + ((D_coeff - C_coeff * epsilon * wn) / wd) ** 2)  # Amplitude factor
 
-    # Assuming DeltaAngleGrid, Uconv, Ugrid, and Xtotal are already defined
-    Ppeak = DeltaXtotal * P0 / (Xtotal_initial)
+    DeltaPSecond_up = A_coeff + B_coeff/t_pll*np.exp(-t_DeltaP/t_pll)+R_coeff*np.exp(-epsilon*wn*t_DeltaP)
+    DeltaPSecond_down = A_coeff +B_coeff/t_pll*np.exp(-t_DeltaP/t_pll)-R_coeff*np.exp(-epsilon*wn*t_DeltaP)
 
-    print("Delta X total", DeltaXtotal)
-    print("peak power change", Ppeak)
-    # Define the time vector for simulation
-    #t_DeltaP = np.linspace(0, End_Time, 10000)  # From 0 to 2 seconds
+    Ppeak = A_coeff+B_coeff/t_pll+np.sqrt(C_coeff**2+(C_coeff*(D_coeff/C_coeff-epsilon*wn)/wd))
+    TresponseTime = 4/(epsilon*wn)
 
-    # Assuming epsilon, wn, wd, t, and Ppeak are already defined as NumPy arrays or scalars
-    DeltaP = Ppeak * (
-                np.exp(-epsilon * wn * t_DeltaP) * np.cos(wd * t_DeltaP) + (D / (2 * H) - epsilon * wn) / wd * np.exp(
-            -epsilon * wn * t_DeltaP) * np.sin(wd * t_DeltaP)) * -1
-    P = P0 + DeltaP
 
-    numerator = D - 2 * H * epsilon * wn
-    denominator = 2 * H * wd
-    A = np.sqrt(1 + (numerator / denominator) ** 2)
+    exp_decay_pll = (B_coeff / t_pll) * np.exp(-t_DeltaP / t_pll)
+    R_coeff = np.sqrt(C_coeff ** 2 + ((D_coeff - C_coeff * epsilon * wn) / wd) ** 2)  # Amplitude factor
+    upper_env = A_coeff + exp_decay_pll + R_coeff * np.exp(-epsilon * wn * t_DeltaP)
+    lower_env = A_coeff + exp_decay_pll - R_coeff * np.exp(-epsilon * wn * t_DeltaP)
 
-    AmplitudeEnvelops = np.sqrt(1 + ((D - 2 * H * epsilon * wn) / (2 * H * wd)) ** 2)
+    return -delta_p1,Ppeak,epsilon,-upper_env,-lower_env,TresponseTime
 
-    DeltaP_up_anal_array =  np.abs(AmplitudeEnvelops * Ppeak * np.exp(-epsilon * wn * t_DeltaP))
-    DeltaP_down_anal_array = np.abs(AmplitudeEnvelops * Ppeak * np.exp(-epsilon * wn * t_DeltaP))*-1
 
-    #Before Event the values of the signals are set to "0"
-    DeltaP = np.where(t_DeltaP < Event_Time, 0, DeltaP)
-    DeltaP_up_anal_array = np.where(t_DeltaP < Event_Time, 0, DeltaP_up_anal_array)
-    DeltaP_down_anal_array = np.where(t_DeltaP < Event_Time, 0, DeltaP_down_anal_array)
-    return DeltaP,Ppeak,epsilon, DeltaP_up_anal_array, DeltaP_down_anal_array
+#DeltaP fonction in case of SCR jump, we return also Ppeak, epsilon and two exponential up (DeltaP_up_anal_array) and low (DeltaP_down_anal_array)
+#etDeltaP_NotDELAYED(D_Damping,H,x_total_initial,P0,time_array):
+def GetDeltaP(D_Damping,H,x_total_initial,P0):
+    delta_p1 = np.zeros_like(t_DeltaP)
+    DeltaPSecond_up= np.zeros_like(t_DeltaP)
+    DeltaPSecond_down = np.zeros_like(t_DeltaP)
+
+    delta_p1,Ppeak,epsilon,delta_p1_up,delta_p1_down,TresponseTime = GetDeltaP_NotDELAYED(D_Damping, H, x_total_initial, P0, t_DeltaP)  # <-- your actual function here
+
+    delta_p1 = np.where(Event_Time < t_DeltaP, delta_p1, 0)
+    DeltaPSteadyState = delta_p1[-1]  # Ppeak is the
+    delta_p1_up = np.where(Event_Time <t_DeltaP, delta_p1_up ,0 )
+    delta_p1_down =np.where(Event_Time<t_DeltaP,delta_p1_down,0)
+
+
+   # -delta_p2, Ppeak, epsilon, -delta_p2_up, -delta_p2_down, TresponseTime = GetDeltaP_NotDELAYED(D_Damping, H, x_total_initial,P0,t_DeltaP-RoCofStop_Time)
+    delta_p2 =  GetDeltaP_NotDELAYED(D_Damping, H, x_total_initial,P0,t_DeltaP-RoCofStop_Time)[0]*-1
+    delta_p2_up = GetDeltaP_NotDELAYED(D_Damping, H, x_total_initial, P0, t_DeltaP - RoCofStop_Time)[3] * -1
+    delta_p2_down = GetDeltaP_NotDELAYED(D_Damping, H, x_total_initial, P0, t_DeltaP - RoCofStop_Time)[4] * -1
+
+    delta_p2 = np.where(RoCofStop_Time < t_DeltaP, delta_p2, 0)
+    delta_p2_up = np.where(RoCofStop_Time < t_DeltaP, delta_p2_up, 0)
+    delta_p2_down = np.where(RoCofStop_Time < t_DeltaP, delta_p2_down, 0)
+
+    DeltaP = delta_p1 + delta_p2
+
+
+    DeltaP_up = delta_p1_up + delta_p2_up
+
+
+    DeltaP_down = delta_p1_down + delta_p2_down
+
+
+    TresponseTime= GetDeltaP_NotDELAYED(D_Damping, H, x_total_initial, P0, t_DeltaP)[5]
+
+    print("TresponseTime", TresponseTime)
+    return DeltaP, Ppeak, epsilon, DeltaP_up, DeltaP_down
 
 #The tunnel to be considered at the end is either 0.02In or 5% of Ppeak
 def GetTunnel(Ppeak):
@@ -128,6 +212,7 @@ def GetEnvelops(MargeUp,MargeDown,Signal,Tunnel,DeltaP):
     Signal_down_anal = Cutsignal(Pmin_, Signal_down_anal, Pmax_)
     print(type(Signal_up_anal),"the type of up_anal")
     return Signal_up_anal,Signal_down_anal
+
 
 # In the case of a positive DeltaP, we need to account for the fact that DeltaP increases during the initial moment.
 # This is why we do not immediately apply the exponential decay, as it would not reflect the expected behavior.
@@ -220,22 +305,16 @@ def GetValueatSpecificTime(SelectedTime,Signal):
 
 #Variables needed to be fulfilled in order to implement the envelops
 
-SCR_init=2 #SCR ini
-SCR_final=10 #SCR final
+SCR_init=10 #SCR ini
 
 Z_init=1/SCR_init
-Z_final=1/SCR_final
-
-print(Z_init)
-print(Z_final)
-
-Delta_ZGrid = Z_final-Z_init #DeltaZgrid
-
-print("DeltaZgrid",Delta_ZGrid)
 
 
+
+RoCoF = -0.5/50  # Rate of Change of Frequency (Hz/s) ou pu ?
 D=50#Damping constant of the VSM control
 H=3 #Inertia constant (s)
+t_pll = 0.01    # PLL time constant (s)
 wb=314 # Base angular frequency(rad/s)
 xtr=0.06 #Transformer reactance (pu)
 Ugrid=1 # RMS voltage Ugrid (pu)
@@ -248,8 +327,7 @@ Pmax_MoisTunnel= Pmax_*0.95 #Pmax
 Pmin_=-1.4 #Pmin
 Pmin_MoisTunnel=Pmin_*0.95
 delay_EMT_ms = 20 # 20 ms of delay for EMT simulations
-
-
+u_prod = Uconv*Ugrid
 
 '''
 if EventOnZgrid == "up":
@@ -266,18 +344,20 @@ else:
 
 # Define the time vector for simulation
 
-
-Start_Time = -1
-Event_Time = 0
-End_Time = 4
+# Define the time vector for simulation
+Start_Time = -1 # sec
+Event_Time=0 #keep this value to "0"
+RoCofDuration=3 # duration of RoCof after that RoCof=0
+RoCofStop_Time= Event_Time+RoCofDuration # sec
+End_Time = 10 # sec
 NbPoints = 10000
 t_DeltaP = np.linspace(Start_Time, End_Time, NbPoints)  # From Start_Time to End_Time
 fs = (End_Time - Start_Time) / NbPoints  # Sampling frequency (Hz)
 
 
 # Calculating VARIABLES that need to be defined to calculate DeltaP
-Xtotal_initial = Xeff + Z_final  # X total initial that is equal to Xeff+Xgrid final
-DeltaXtotal = Delta_ZGrid  # Variation in Xtotal
+Xtotal_initial = Xeff + Z_init  # X total initial that is equal to Xeff+Xgrid final
+
 
 #Defining margins for H and D
 
@@ -309,14 +389,16 @@ MargeDown=0.2 # This is the Margin down used in DeltaP*(1+-MargeDown)+Tunnel
 DeltaP = DeltaP_array[0]
 Tunnel = Tunnel_array[0]
 epsilon = Epsilon_array[0]
+DeltPUperExpBound = DeltaPSecond_up_anal_array[0]
+DeltPLowerExpBound = DeltaPSecond_down_anal_array[0]
 
 #We get the value of P at Event_Time + DeltaSmallT
 DeltaPAtEventTime = GetValueatSpecificTime(Event_Time+0.01,DeltaP)
 
 
 results = [GetEnvelops(MargeUp,MargeDown,DeltaP_array[i],Tunnel_array[i],DeltaP) for i in range(len(D_array))]
-results_PSecond_up_anal_array= [GetEnvelops(MargeUp,MargeDown,DeltaPSecond_up_anal_array[i],Tunnel_array[i],DeltaP) for i in range(len(D_array))]
-results_PSecond_down_anal_array= [GetEnvelops(MargeUp,MargeDown,DeltaPSecond_down_anal_array[i],Tunnel_array[i],DeltaP) for i in range(len(D_array))]
+#results_PSecond_up_anal_array= [GetEnvelops(MargeUp,MargeDown,DeltaPSecond_up_anal_array[i],Tunnel_array[i],DeltaP) for i in range(len(D_array))]
+#results_PSecond_down_anal_array= [GetEnvelops(MargeUp,MargeDown,DeltaPSecond_down_anal_array[i],Tunnel_array[i],DeltaP) for i in range(len(D_array))]
 
 
 
@@ -328,14 +410,14 @@ P_up_anal_array, P_down_anal_array = map(np.array, zip(*results))
 # PSecond_up_up_anal_array   = (DeltaPSecond_up_anal_array * (1 + MarginUp) + Tunnel + P0)
 # PSecond_up_down_anal_array = (DeltaPSecond_up_anal_array * (1 + MarginUp) + Tunnel + P0)
 # A modification to PSecond_up_down_anal_array is done as clarified in "GetEnvelops"
-PSecond_up_up_anal_array, PSecond_up_down_anal_array = map(np.array, zip(*results_PSecond_up_anal_array))
+#PSecond_up_up_anal_array, PSecond_up_down_anal_array = map(np.array, zip(*results_PSecond_up_anal_array))
 # The response is based on DeltaPSecond_down_anal_array, representing the lower exponential behavior.
 # This applies in the case where DeltaP > 0.
 # Both the upper and lower bounds of the response are calculated as follows:
 # PSecond_down_up_anal_array   = (DeltaPSecond_down_anal_array * (1 + MarginUp) + Tunnel + P0)
 # PSecond_down_down_anal_array = (DeltaPSecond_down_anal_array * (1 + MarginUp) + Tunnel + P0)
 # A modification to PSecond_up_down_anal_array is done as clarified in "GetEnvelops"
-PSecond_down_up_anal_array, PSecond_down_down_anal_array  = map(np.array, zip(*results_PSecond_down_anal_array))
+#PSecond_down_up_anal_array, PSecond_down_down_anal_array  = map(np.array, zip(*results_PSecond_down_anal_array))
 
 
 
@@ -357,9 +439,9 @@ print("Start_Time+0.2",Start_Time+0.2)
 # I don't believe we still need P_up_anal_array or P_50Prc,
 # but I’ve left them in place to avoid re-testing the entire workflow at this stage.
 
-stacked = np.vstack(( P_up_anal_array, [P_50Prc], PSecond_up_up_anal_array ))
+#stacked = np.vstack(( P_up_anal_array, [P_50Prc], PSecond_up_up_anal_array ))
 # Compute the element-wise max, ignoring NaNs
-P_up_finale = np.nanmax(stacked, axis=0)
+#P_up_finale = np.nanmax(stacked, axis=0)
 
 
 # Stack the arrays into a 2D NumPy array
@@ -367,9 +449,9 @@ P_up_finale = np.nanmax(stacked, axis=0)
 # I don't believe we still need P_down_anal_array or P_50Prc,
 # but I’ve left them in place to avoid re-testing the entire workflow at this stage.
 
-stacked = np.vstack((P_down_anal_array, [P_50Prc],PSecond_down_down_anal_array))
+#stacked = np.vstack((P_down_anal_array, [P_50Prc],PSecond_down_down_anal_array))
 # Compute the element-wise max, ignoring NaNs
-P_down_finale = np.nanmin(stacked, axis=0)
+#P_down_finale = np.nanmin(stacked, axis=0)
 
 
 print("P_50Prc",P_50Prc)
@@ -383,9 +465,9 @@ if EMT:
 
     shift_Time = 0
     # Pad with the initial value instead of zero
-    initial_value = P_up_finale[0]
-    P_up_finale = delay_signal(delay_EMT_ms, fs, P_up_finale)
-    P_down_finale = delay_signal(delay_EMT_ms, fs, P_down_finale)
+#    initial_value = P_up_finale[0]
+ #   P_up_finale = delay_signal(delay_EMT_ms, fs, P_up_finale)
+  #  P_down_finale = delay_signal(delay_EMT_ms, fs, P_down_finale)
     P_PCC = delay_signal(delay_EMT_ms, fs, P_PCC)
     P_50Prc = delay_signal(delay_EMT_ms, fs, P_50Prc)
 
@@ -405,86 +487,16 @@ else:
 
 ##############plot PCC from Open Modelica
 
-# Path to the CSV file
-BaseLocation= "RMSsimulations/"
-
-#OverDAMPED
-#csv_file_path_Gabarits=BaseLocation + "gabarit_overdamped.csv"
-#csv_file_path_OM=BaseLocation + "OM_DeltaP_OverDampedSCR2H3D109Angle3.6.csv"
-#csv_file_path_OM=BaseLocation +"H=10,D=133,Xeff=0.25,Imax=1.2,P0=0.5,SCRini=4,SCRfinal=2,Imax=1.2.csv"
-csv_file_path_OM=BaseLocation+"H=5,D=140,Xeff=0.06,Imax=1.2,P0=0.5,SCRini=2,SCRmax=4,Imax=1.2.csv"
-#Name of the Columns
-NameColumnsDataFrame = ["Time","Pup","Pdown"]
-# Read the CSV file into a DataFrame
-#dataUseCase_Gabarits = pd.read_csv(csv_file_path_Gabarits,sep=";")
-
-dataUseCase_OM = pd.read_csv(csv_file_path_OM)
 
 
-
-P_Pcc="gFM_VSM_cc.measurementPcc.PGenPu"
-
-#filtering times
-TimeInit=9
-TimeFinal=11
-
-TimeInit=4
-TimeFinal=8
-
-#getting time
-t=dataUseCase_OM['time']
-y=dataUseCase_OM[P_Pcc]
-
-# Extract data from t = 5 to t = 10
-mask = (t >= TimeInit) & (t <= TimeFinal)
-t_selected = t[mask]  # Time values in range 10-15
-y_selected = y[mask]  # Corresponding function values
-
-
-
-# Shift time so that it starts at t = 0
-t_shifted = t_selected -t_selected.iloc[0]  # Subtract the first value to start from 0
-#print(t_shifted)
-
-#filtering over a time range
-filtered_dataUseCase_OM = dataUseCase_OM[(dataUseCase_OM['time'] >= TimeInit) & (dataUseCase_OM['time'] <= TimeFinal)]
-
-#Taking the axis X
-axisX = filtered_dataUseCase_OM['time']
 
 
 # Create the plot
 
 
 
-
-Title =  "P0="+ str(P0) +"pu, SCRinit=" + str(SCR_init) + ", SCRfinal= "+str(SCR_final) + ", Epsilon= " + str(round(epsilon,3))  +", D= " + str(D) + ", H= " +str(H) + ", Xeff= " + str(Xeff)+ ", Pmax="+ str(Pmax_) +"pu"+ ", EMT=" +str(EMT)
-
-#Plot EMT
-BaseLocation= "EMTSimulations/Ppos_GFM_EMT_model_P0=0.5.csv"
-csv_file_path_EMT = BaseLocation
-#Name of the Columns
-NameColumnsDataFrame = ["Time","Signal"]
-# Read the CSV file into a DataFrame
-dataUseCase_EMT = pd.read_csv(csv_file_path_EMT)
-# Access the columns
-time1 = dataUseCase_EMT['Time']
-Ppos_GFM_EMT_model = dataUseCase_EMT['Signal']
-
-
-#Plot EMT
-BaseLocation= "EMTSimulations/Ppos_GFM_ideal_P0=0.5.csv"
-csv_file_path_EMT = BaseLocation
-#Name of the Columns
-NameColumnsDataFrame = ["Time","Signal"]
-# Read the CSV file into a DataFrame
-dataUseCase_EMT = pd.read_csv(csv_file_path_EMT)
-# Access the columns
-time2 = dataUseCase_EMT['Time']
-Ppos_GFM_ideal = dataUseCase_EMT['Signal']
-
-
-
+# Create the plot
+Title= "P0="+ str(P0) +", RoCoF=" + str(RoCoF) +"pu"+ ", Duration="+str(RoCofDuration) +"s" +  ", Epsilon= " + str(round(epsilon,3)) + ", ωd= " + ", D= " + str(D) + ", H= " +str(H) + ", Xeff= " + str(Xeff)+ ", EMT=" +str(EMT) +", SCR="+str(SCR_init)
 
 
 
@@ -492,32 +504,10 @@ shift_Time= 0
 
 # Create the plot
 plt.figure(figsize=(8, 5))  # Set figure size
-plt.plot(t_shifted-1, y_selected, label="P_pcc from Open Modelica", color='red', linestyle='-')  # Adding simulation
 
-plt.plot(t_DeltaP+shift_Time,P_PCC, label="Ppcc", color='m', linestyle='-')  # First plot
-plt.plot(t_DeltaP+shift_Time,P_down_anal_array[0], label="Pdown_analytical", color='m', linestyle='--')  # First plot
-plt.plot(t_DeltaP+shift_Time,P_up_anal_array[0], label="Pup_analytical", color='m', linestyle=':')  # First plot
-
-plt.plot(t_DeltaP+shift_Time,P_down_anal_array[1], label="Pdown_analytical", color='black', linestyle='--')  # First plot
-plt.plot(t_DeltaP+shift_Time,P_up_anal_array[1], label="Pup_analytical", color='black', linestyle=':')  # First plot
-
-plt.plot(t_DeltaP+shift_Time,P_down_anal_array[2], label="Pdown_analytical", color='r', linestyle='--')  # First plot
-plt.plot(t_DeltaP+shift_Time,P_up_anal_array[2], label="Pup_analytical", color='r', linestyle=':')  # First plot
-
-#Plottijg the first order responses envelops of the second order response
-
-plt.plot(t_DeltaP+shift_Time,PSecond_up_up_anal_array[0], label="PSecond_up_anal_array", color='m', linestyle=':')  # First plot
-plt.plot(t_DeltaP+shift_Time,PSecond_down_down_anal_array[0], label="PSecond_down_anal_array", color='m', linestyle='-')  # First plot
-
-plt.plot(t_DeltaP+shift_Time,PSecond_up_up_anal_array[1], label="PSecond_up_anal_array", color='black', linestyle=':')  # First plot
-plt.plot(t_DeltaP+shift_Time,PSecond_down_down_anal_array[1], label="PSecond_down_anal_array", color='black', linestyle='-')  # First plot
-
-plt.plot(t_DeltaP+shift_Time,PSecond_up_up_anal_array[2], label="PSecond_up_anal_array", color='r', linestyle=':')  # First plot
-plt.plot(t_DeltaP+shift_Time,PSecond_down_down_anal_array[2], label="PSecond_down_anal_array", color='r', linestyle='-')  # First plot
-
-plt.plot(t_DeltaP+shift_Time,P_50Prc, label="P_50%", linewidth='3')  # First plot
-
-#plt.plot(t_DeltaP+shift_Time,P_up_finale, label="Pup_final", linewidth=2)  # First plot
+plt.plot(t_DeltaP+shift_Time,DeltPUperExpBound, label="UperBound", color='r', linestyle=':')  # First plot
+plt.plot(t_DeltaP+shift_Time,DeltPLowerExpBound, label="LowerBound", color='r', linestyle='-')  # First plot
+plt.plot(t_DeltaP+shift_Time,DeltaP, label="DeltaP", color='r', linestyle='-')  # First plot
 
 
 # Add vertical line at t = 10 seconds
@@ -536,31 +526,16 @@ plt.grid(True)  # Add grid for better visualization
 
 #Delay the signals that will be save in a csv file
 shift_Time=0 #ms
-P_up_finale,P_down_finale,P_PCC = DelayEnvelops(P_up_finale,P_down_finale,P_PCC,shift_Time)
+#P_up_finale,P_down_finale,P_PCC = DelayEnvelops(P_up_finale,P_down_finale,P_PCC,shift_Time)
 
 
-
-# Save to CSV
-# Combine into a DataFrame with custom column names
-df = pd.DataFrame({
-    "Time (s)": t_DeltaP,
-    "P_PCC (pu)": P_PCC,
-    "P_down (pu)": P_down_finale,
-    "P_up (pu)": P_up_finale
-})
-
-# Export to CSV
-df.to_csv(LocationFile, index=False)
 
 
 # Create the plot
 plt.figure(figsize=(8, 5))  # Set figure size
 #plt.plot(t_shifted-1, y_selected, label="P_pcc from Open Modelica", color='b', linestyle='-')  # Adding simulation
 plt.plot(t_DeltaP,P_PCC, label="P_PCC analytical", linewidth='3')  # First plot
-plt.plot(t_DeltaP,P_down_finale, label="Pdown_final", linewidth=2)  # First plot
-plt.plot(t_DeltaP,P_up_finale, label="Pup_final", linewidth=2)  # First plot
-#plt.plot(time1, Ppos_GFM_EMT_model, label="Ppos_GFM_EMT_model from EMTP", color='gold', linestyle='-')  # EMT plot
-#plt.plot(time2, Ppos_GFM_ideal, label="Ppos_GFM_ideal from EMTP", color='red', linestyle='-')  # EMT plot
+
 # Add labels, title, and legend
 plt.xlabel("sec")
 plt.ylabel("P at PCC (pu)")

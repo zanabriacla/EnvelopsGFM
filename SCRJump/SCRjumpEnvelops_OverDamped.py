@@ -140,8 +140,8 @@ def DelayEnvelops(P_up_finale,P_down_finale,P_PCC,shift_Time):
     return P_up_finale,P_down_finale,P_PCC
 
 
-SCR_init=2 #SCR initial
-SCR_final=10 #SCR final
+SCR_init=10 #SCR initial
+SCR_final=2 #SCR final
 
 Z_init=1/SCR_init
 Z_final=1/SCR_final
@@ -160,7 +160,7 @@ Ugrid=1 # RMS voltage Ugrid (pu)
 Uconv=1 # RMS voltage Uconverter (pu)
 Xeff=0.25 # effective reactance (pu)
 EMT= True # Can be "True" or "False" EMT is activated (20ms for the measures)
-P0= 0.95 # Initial power (pu)
+P0= 0.5 # Initial power (pu)
 Pmax_=1.4 #Pmax
 Pmax_MoisTunnel= Pmax_*0.95 #Pmax defined in ENTSOE
 Pmax_MoisTunnel= 1 #Pmax defined by RTE

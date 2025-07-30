@@ -11,13 +11,25 @@ from sympy import symbols, Function, Heaviside
 
 
 
-#instead of an exponential that groes from the steady state value of the signal at t = RoCofTime stop
-#the upper boudn is modified to consider the value of P0+ DeltaP*(1+margin) we do not consider anymore the value of P at steady state
+# In the case where DeltaP is positive:
+# - V1 upper bound is an exponential that grows from the steady-state value of the signal at t = RoCoF stop time.
+# - V2 upper bound is an increase starting from the signal value at RoCoF stop time,
+#   with a deviation equal to DeltaP * MarginUp.
+# - V3 upper bound is defined as P0 + DeltaP * (1 + MarginUp), representing a margin applied to the analytical value.
 
 def delay_signal(delay_ms,fs,signal):
     delay_samples = int((delay_ms / 1000) * 1 / fs)
     signal_delayed = np.concatenate((np.full(delay_samples, signal[0]), signal))[:len(signal)]
     return signal_delayed
+
+# DeltaP is calculated using mathematical equations.
+# The response time is a key output used to determine when to switch
+# from a dynamic tunnel (dependent on different D and H values)
+# to a constant tunnel.
+# The final tunnel configuration will be based on the D and H base values.
+# Here, the tunnel is defined based on a final value at the RoCoF stop time,
+# along with a deviation (delta) from that value.
+# We obtained different final values at RoCoF stop time depending on D,H set
 
 def GetDeltaP_NotDELAYED(D_Damping,H,Xtotal_initial,P0,t_DeltaP):
 
@@ -78,7 +90,13 @@ def GetDeltaP_NotDELAYED(D_Damping,H,Xtotal_initial,P0,t_DeltaP):
     #Ppeak=DeltaP[-1] # In this case DeltaP steady state will be calculated in another function "GetDeltaP"
     return DeltaP,xi,TresponseTime
 
-#Here we are going to form DeltaP considering the RoCof that stops increasing or decreasing in order to see that P comes back to a steady state value
+# Here we construct DeltaP considering the RoCoF (Rate of Change of Frequency),
+# which starts increasing at the event time and stops at the RoCoF stop time.
+# The objective is to observe how the power (P) returns to its initial reference value.
+# To do this, we take the DeltaP response starting immediately (without initial delay),
+# then apply a delay equal to the elapsed time between the event start and the RoCoF stop.
+# Finally, we take the negative of this delayed signal.
+
 def GetDeltaP(D_Damping,H,Xtotal_initial,P0):
 
 
@@ -97,12 +115,6 @@ def GetDeltaP(D_Damping,H,Xtotal_initial,P0):
 
     DeltaP= DeltaP + DeltaP_Recovered
     DeltaP=DeltaP*-1
-
-    #Deactivate only to see the analitical response of Delta¨P
-    # Create the plot
-    #plt.figure(figsize=(8, 5))  # Set figure size
-    #plt.plot(t_DeltaP, DeltaP, label="Ppcc", color='black', linestyle='--')  # First plot
-
 
     print("PsteadyState",DeltaPSteadyState)
     return DeltaP,DeltaPSteadyState,xi,TresponseTime
@@ -123,7 +135,15 @@ def Cutsignal(Valuemin,Signal,Valuemax):
 
 
 
-#We are given P_PCC that is DeltaP_array[0]+P0
+# The function add_margin is no longer used, since the margin is now defined as:
+# margin = DeltaP * (1 ± Marge) * mask
+#
+# At t = T_response, we begin limiting the signal to a value equal to:
+# P_PCC + tunnel
+#
+# P_PCC is defined as DeltaP + P0, based on the D and H base values.
+# We also apply limits to prevent overcurrent or undercurrent conditions.
+
 def GetEnvelops(MargeUp,MargeDown,DeltaP,Tunnel,TresponseTime,P_PCC):
 
 
@@ -284,6 +304,7 @@ def KeepTheValueatSpecificTimeLower(Signal,SpecificTime,maskTime):
     Signal = np.where(condition, Signal_value_at_SpecificTime_Time, Signal)
     return Signal
 
+#
 def DelayEnvelops(P_up_finale,P_down_finale,P_PCC,shift_Time):
     TimeTODelay_All_Signals = shift_Time  # ms
 

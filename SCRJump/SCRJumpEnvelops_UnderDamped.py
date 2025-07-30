@@ -139,8 +139,9 @@ def EnvelopDowModify(Signal_Down,P_50Prc):
     mask = (t_DeltaP >= Event_Time) & (t_DeltaP <= Event_Time+DeltaTInitToKeepPeakP_50Prc)
     Signal_Down = np.where(mask, P_50Prc, Signal_Down)
     #in case reaching the max value we consider that the envelop that is not saturated will be at the level saturated-0.2pu
-    Signal_Down = np.where(Signal_Down < Pmin_, Pmin_ +0.2, Signal_Down)
-    Signal_Down = np.where(Signal_Down > Pmax_, Pmax_ - 0.2, Signal_Down)
+    #this is applied only during the mask time, it means when we have cosidereded 50% of DeltaP
+    Signal_Down = np.where(Signal_Down*mask < Pmin_, Pmin_ +0.2, Signal_Down)
+    Signal_Down = np.where(Signal_Down*mask > Pmax_, Pmax_ - 0.2, Signal_Down)
     return Signal_Down
 
 def LimitingReversePower(P_up_finale,P_down_finale, P0,Tunnel,DeltaP):
@@ -220,8 +221,8 @@ def GetValueatSpecificTime(SelectedTime,Signal):
 
 #Variables needed to be fulfilled in order to implement the envelops
 
-SCR_init=2 #SCR ini
-SCR_final=10 #SCR final
+SCR_init=10 #SCR ini
+SCR_final=2 #SCR final
 
 Z_init=1/SCR_init
 Z_final=1/SCR_final
@@ -234,7 +235,7 @@ Delta_ZGrid = Z_final-Z_init #DeltaZgrid
 print("DeltaZgrid",Delta_ZGrid)
 
 
-D=50#Damping constant of the VSM control
+D=80#Damping constant of the VSM control
 H=3 #Inertia constant (s)
 wb=314 # Base angular frequency(rad/s)
 xtr=0.06 #Transformer reactance (pu)
@@ -242,7 +243,7 @@ Ugrid=1 # RMS voltage Ugrid (pu)
 Uconv=1 # RMS voltage Uconverter (pu)
 Xeff=0.25 # effective reactance (pu)
 EMT= True # Can be "True" or "False" EMT is activated (20ms for the measures)
-P0= 0 # Initial power (pu)
+P0= 0.95 # Initial power (pu)
 Pmax_=1.4 #Pmax
 Pmax_MoisTunnel= Pmax_*0.95 #Pmax
 Pmin_=-1.4 #Pmin
@@ -281,8 +282,8 @@ DeltaXtotal = Delta_ZGrid  # Variation in Xtotal
 
 #Defining margins for H and D
 
-Ratio_H_D_UP = 0.2 # Use to have two more values for D and H: D*(1+Ratio_H_D_UP), H*(1+Ratio_H_D_UP)
-Ratio_H_D_Down = 0.2 # Use to have two more values for D and H: D*(1-Ratio_H_D_Down), H*(1-Ratio_H_D_Down)
+Ratio_H_D_UP = 0.15 # Use to have two more values for D and H: D*(1+Ratio_H_D_UP), H*(1+Ratio_H_D_UP)
+Ratio_H_D_Down = 0.15 # Use to have two more values for D and H: D*(1-Ratio_H_D_Down), H*(1-Ratio_H_D_Down)
 
 # Defining arrays to consider DeltaP for different H and D
 DeltaP_array = []

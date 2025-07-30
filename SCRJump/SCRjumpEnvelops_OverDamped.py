@@ -184,8 +184,8 @@ def EnvelopDowModify(Signal_Down,P_50Prc):
     Signal_Down = np.where(Signal_Down*mask > Pmax_, Pmax_ - 0.2, Signal_Down)
     return Signal_Down
 
-SCR_init=10 #SCR initial
-SCR_final=2 #SCR final
+SCR_init=2 #SCR initial
+SCR_final=10 #SCR final
 
 Z_init=1/SCR_init
 Z_final=1/SCR_final
@@ -459,7 +459,7 @@ P_up_finale,P_down_finale,P_PCC = DelayEnvelops(P_up_finale,P_down_finale,P_PCC,
 
 
 
-LocationFile=  "AnalyticalEnvelops/"+Title +".csv"
+LocationFile=  "AnalyticalEnvelops/OverDamped/"+Title +".csv"
 
 
 # Save to CSV

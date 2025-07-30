@@ -7,12 +7,15 @@ import numpy as np
 
 
 
-
+#Envelopes are done following this configuration
+# Signal_up_anal = DeltaP * (1 + MargeUp) + Tunnel + P0
+# Signal_down_anal = DeltaP * (1 - MargeDown) - Tunnel + P0
 
 def delay_signal(delay_ms,fs,signal):
     delay_samples = int((delay_ms / 1000) * 1 / fs)
     signal_delayed = np.concatenate((np.full(delay_samples, signal[0]), signal))[:len(signal)]
     return signal_delayed
+
 
 def GetDeltaP(D,H,Xtotal_initial,P0):
     #t_DeltaP = np.linspace(Start_Time, End_Time, 10000)  # From 0 to 2 seconds
@@ -64,11 +67,24 @@ def GetEnvelops(MargeUp,MargeDown,Signal,Tunnel):
         Signal_up_anal = Signal * (1 + MargeUp) + Tunnel + P0
         Signal_down_anal = Signal * (1 - MargeDown) - Tunnel + P0
 
+        # Modification of the signal down to consider DeltaP*50% at the beginning
+        # Adding 0.005, If DeltaP = 0 and the power was previously at P = 0.02 (tunnel of 2%), the power is reduced back to 0.
+        # in this case we would prefer to not consider DeltaP
+        # But we added a small deviation of 0.5%
+        # This prevents an unintended power offset from being retained when no DeltaP is applied.
 
-        # Putting a limit to the active power
+        P_50Prc = P0 + np.where(t_DeltaP >= Event_Time, Signal * 0.5 + 0.005, Signal)
+        Signal_down_anal = EnvelopDowModify(Signal_down_anal, P_50Prc)
+
+        # Limiting the active power to a maximum value, defined as Pmax_MoisTunnel.
+        # An offset is introduced between the upper and lower bounds in case both are subject to current limitation.
+        # Without this offset, the two curves would overlap at the same level.
+
         mask = (t_DeltaP >= Event_Time) & (t_DeltaP <= End_Time)
         condition = mask & (Signal_down_anal > (Pmax_MoisTunnel))
         Signal_down_anal = np.where(condition, Pmax_MoisTunnel, Signal_down_anal)
+
+
 
 
     else:
@@ -79,15 +95,28 @@ def GetEnvelops(MargeUp,MargeDown,Signal,Tunnel):
 
         Signal_up_anal = Signal * (1 - MargeUp) + Tunnel + P0
 
+        # Modification of the signal up to consider DeltaP*50% at the beginning
+        # Adding 0.005, If DeltaP = 0 and the power was previously at P = 0.02 (tunnel of 2%), the power is reduced back to 0.
+        # in this case we would prefer to not consider DeltaP
+        # But we added a small deviation of 0.5%
+        # This prevents an unintended power offset from being retained when no DeltaP is applied.
+
+        P_50Prc = P0 + np.where(t_DeltaP >= Event_Time, Signal * 0.5 + 0.005, Signal)
+        Signal_up_anal = EnvelopDowModify(Signal_up_anal, P_50Prc)
+
         # Putting a limit to the active power
+        # Limiting the active power to a maximum value, defined as Pmin_MoisTunnel.
+        # An offset is introduced between the upper and lower bounds in case both are subject to current limitation.
+        # Without this offset, the two curves would overlap at the same level.
 
         mask = (t_DeltaP >= Event_Time) & (t_DeltaP <= End_Time)
         condition = mask & (Signal_up_anal < (Pmin_MoisTunnel))
         print(np.any(mask))  # Should be True if any value exceeds P0 + Tunnel during the window
         Signal_up_anal = np.where(condition, Pmin_MoisTunnel, Signal_up_anal)
-
-
         Signal_down_anal = Signal * (1 + MargeDown) - Tunnel + P0
+
+
+    #Both signals need to be cutted to a max and min value
 
     Signal_up_anal = Cutsignal(Pmin_,Signal_up_anal,Pmax_)
     Signal_down_anal = Cutsignal(Pmin_, Signal_down_anal, Pmax_)
@@ -101,6 +130,8 @@ def GetValueatSpecificTime(SelectedTime,Signal):
     value_at_RoCofStop_Time = Signal[index]
     return  value_at_RoCofStop_Time
 
+#In case DeltaP positive, lower envelope is delayed during 10ms to consider a almost instantaneous reaction time
+#in case of EMT a delay of 20ms is added
 def DelayEnvelops(P_up_finale,P_down_finale,P_PCC,shift_Time):
     TimeTODelay_All_Signals = shift_Time  # ms
     TimeTODelay_LowerBoundATBeggining = 10  # ms
@@ -139,6 +170,19 @@ def DelayEnvelops(P_up_finale,P_down_finale,P_PCC,shift_Time):
 
     return P_up_finale,P_down_finale,P_PCC
 
+# In the case of a positive DeltaP, we need to account for the fact that DeltaP increases during the initial moment.
+# This is why we do not immediately apply the exponential decay, as it would not reflect the expected behavior.
+# Instead, we hold DeltaP at 50% of its value for a duration defined by "DeltaTInitToKeepPeakP_50Prc",
+# before transitioning to the lower exponential decay.
+def EnvelopDowModify(Signal_Down,P_50Prc):
+    DeltaTInitToKeepPeakP_50Prc = 0.03  # 50ms we kept the value of P_50Prc after that we consider the value of the PSecond_down_up_anal_array
+    mask = (t_DeltaP >= Event_Time) & (t_DeltaP <= Event_Time+DeltaTInitToKeepPeakP_50Prc)
+    Signal_Down = np.where(mask, P_50Prc, Signal_Down)
+    #in case reaching the max value we consider that the envelop that is not saturated will be at the level saturated-0.2pu
+    #this is applied only during the mask time, it means when we have cosidereded 50% of DeltaP
+    Signal_Down = np.where(Signal_Down*mask < Pmin_, Pmin_ +0.2, Signal_Down)
+    Signal_Down = np.where(Signal_Down*mask > Pmax_, Pmax_ - 0.2, Signal_Down)
+    return Signal_Down
 
 SCR_init=10 #SCR initial
 SCR_final=2 #SCR final
@@ -152,7 +196,7 @@ Delta_ZGrid = Z_final-Z_init #DeltaZgrid
 print("DeltaZgrid",Delta_ZGrid)
 
 
-D=80#Damping constant of the VSM control
+D=200#Damping constant of the VSM control
 H=3 #Inertia constant (s)
 wb=314 # Base angular frequency(rad/s)
 xtr=0.06 #Transformer reactance (pu)
@@ -160,13 +204,13 @@ Ugrid=1 # RMS voltage Ugrid (pu)
 Uconv=1 # RMS voltage Uconverter (pu)
 Xeff=0.25 # effective reactance (pu)
 EMT= True # Can be "True" or "False" EMT is activated (20ms for the measures)
-P0= 0.5 # Initial power (pu)
+P0= 0 # Initial power (pu)
 Pmax_=1.4 #Pmax
 Pmax_MoisTunnel= Pmax_*0.95 #Pmax defined in ENTSOE
 Pmax_MoisTunnel= 1 #Pmax defined by RTE
 Pmin_=-1.4 #Pmin
 Pmin_MoisTunnel= Pmin_*0.95 #Pmax defined in ENTSOE
-Pmin_MoisTunnel=-1 #Pmax defined by RTE
+Pmin_MoisTunnel=-1 #Pmin defined by RTE
 
 
 #second Order system
@@ -252,12 +296,15 @@ P_50Prc=Cutsignal(Pmin_,P_50Prc,Pmax_)
 
 
 # Stack the arrays into a 2D NumPy array
-stacked = np.vstack((P_up_anal_array , [P_50Prc]))
+#We should not use here DeltaP*50% P_50Prc since this value need to be considered only during the first instants
+#stacked = np.vstack((P_up_anal_array , [P_50Prc]))
+stacked = np.vstack((P_up_anal_array ))
 # Compute the element-wise max, ignoring NaNs
 P_up_finale = np.nanmax(stacked, axis=0)
 
 # Stack the arrays into a 2D NumPy array
-stacked = np.vstack((P_down_anal_array , [P_50Prc]))
+#We should not use here DeltaP*50% P_50Prc since this value need to be considered only during the first instants
+stacked = np.vstack((P_down_anal_array ))
 # Compute the element-wise max, ignoring NaNs
 P_down_finale = np.nanmin(stacked, axis=0)
 
@@ -272,7 +319,7 @@ if EMT:
     shift_Time = 0
     # Pad with the initial value instead of zero
     initial_value = P_up_finale[0]
-   # P_up_finale = delay_signal(delay_ms, fs, P_up_finale)
+    P_up_finale = delay_signal(delay_ms, fs, P_up_finale)
     P_down_finale = delay_signal(delay_ms, fs, P_down_finale)
     P_PCC = delay_signal(delay_ms, fs, P_PCC)
     P_50Prc = delay_signal(delay_ms, fs, P_50Prc)
@@ -431,12 +478,12 @@ df.to_csv(LocationFile, index=False)
 
 # Create the plot
 plt.figure(figsize=(8, 5))  # Set figure size
-plt.plot(t_shifted, y_selected, label="P_pcc from RMS simulation", color='b', linestyle='-')  # First plot
+#plt.plot(t_shifted, y_selected, label="P_pcc from RMS simulation", color='b', linestyle='-')  # First plot
 plt.plot(t_DeltaP,P_PCC, label="P_PCC analytical", linewidth='3')  # First plot
 plt.plot(t_DeltaP,P_down_finale, label="Pdown_final", linewidth=2)  # First plot
 plt.plot(t_DeltaP,P_up_finale, label="Pup_final", linewidth=2)  # First plot
-plt.plot(time1, Ppos_GFM_EMT_model, label="Ppos_GFM_EMT_model from EMTP", color='gold', linestyle='-')  # EMT plot
-plt.plot(time2, Ppos_GFM_ideal, label="Ppos_GFM_ideal from EMTP", color='red', linestyle='-')  # EMT plot
+#plt.plot(time1, Ppos_GFM_EMT_model, label="Ppos_GFM_EMT_model from EMTP", color='gold', linestyle='-')  # EMT plot
+#plt.plot(time2, Ppos_GFM_ideal, label="Ppos_GFM_ideal from EMTP", color='red', linestyle='-')  # EMT plot
 # Add labels, title, and legend
 plt.xlabel("sec")
 plt.ylabel("P at PCC (pu)")
@@ -450,8 +497,8 @@ plt.legend(loc='lower right')  # Show legend
 # Show the plot
 plt.grid(True)  # Add grid for better visualization
 # Save the figure with specific size and resolution
-Path = "RMSsimulations/PNGResults/"+Title + ".png"
-#plt.savefig(Path, bbox_inches='tight', dpi=300)
+Path = "RMSsimulations/PNGResults/Overdamped/"+Title + ".png"
+plt.savefig(Path, bbox_inches='tight', dpi=300)
 
 plt.show()
 

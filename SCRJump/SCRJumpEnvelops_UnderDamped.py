@@ -225,8 +225,8 @@ def GetValueatSpecificTime(SelectedTime,Signal):
 
 #Variables needed to be fulfilled in order to implement the envelops
 
-SCR_init=10 #SCR ini
-SCR_final=2 #SCR final
+SCR_init=2 #SCR ini
+SCR_final=10 #SCR final
 
 Z_init=1/SCR_init
 Z_final=1/SCR_final
